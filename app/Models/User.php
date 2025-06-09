@@ -22,6 +22,7 @@ class User extends Authenticatable
         'email',
         'mobile',
         'password',
+        'job_status',
         'profile_picture',
         'role',
         'active',
@@ -53,5 +54,10 @@ class User extends Authenticatable
     public function bankDetails()
     {
         return $this->hasOne(UserBankDetails::class, 'user_id');
+    }
+
+    public function technicianArea()
+    {
+        return $this->hasOne(TechnicianArea::class, 'user_id');
     }
 }

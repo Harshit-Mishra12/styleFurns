@@ -1,0 +1,55 @@
+name: Deploy Laravel API to Hostinger
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.0"
+      # 👇 Add this step before composer install!
+      - name: Prepare Laravel directories
+        run: |
+          mkdir -p bootstrap/cache
+          chmod -R 775 bootstrap/cache storage
+
+      - name: Install Composer dependencies
+        run: composer install --no-dev --optimize-autoloader
+
+      - name: Prepare storage and cache directories
+        run: |
+          mkdir -p storage/framework/{cache,sessions,views}
+          mkdir -p storage/logs
+          mkdir -p bootstrap/cache
+          chmod -R 777 storage
+          chmod -R 777 bootstrap/cache
+
+      - name: Clear Cache and Optimize
+        run: |
+          php artisan config:clear
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
+
+      - name: Clear Cache Optimize
+        run: php artisan optimize
+
+      - name: Deploy to Hostinger
+        uses: appleboy/scp-action@v0.1.0
+        with:
+          host: 217.21.94.205
+          username: u790439483
+          password: Rammandir@2021
+          port: 65002
+          source: .
+          target: /home/u790439483/domains/cyan-goat-701595.hostingersite.com/public_html

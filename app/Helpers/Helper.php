@@ -28,7 +28,9 @@ class Helper
 
     public static function saveImageToServer($file, $dir)
     {
-        $path = public_path() . $dir;
+        $dir = trim($dir, '/'); // clean up the dir input
+        $path = public_path($dir); // ✅ this automatically joins public/ with the given path
+
         if (!File::exists($path)) {
             File::makeDirectory($path, 0777, true, true);
         }
@@ -36,16 +38,12 @@ class Helper
         $filename = rand(10000, 100000) . '_' . time() . '_' . $file->getClientOriginalName();
         $file->move($path, $filename);
 
-        // $baseUrl = getenv('APP_URL');
-        // $baseUrl = config('app.base_url');
-        $baseUrl = 'http://localhost/';
-        // $baseUrl = 'https://paleturquoise-crab-208767.hostingersite.com/runskart/public';
-
-
-        $filePath = $baseUrl . $dir . $filename;
+        $baseUrl = config('app.url', 'http://localhost/'); // use config fallback
+        $filePath = $baseUrl . '/' . $dir . '/' . $filename;
 
         return $filePath;
     }
+
     public static function deleteImageFromServer($filePath)
     {
         if (File::exists(public_path($filePath))) {
