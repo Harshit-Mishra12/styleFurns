@@ -31,10 +31,10 @@ Route::prefix('v1')->group(function () {
     Route::post("/auth/register", [AuthController::class, 'register']);
     Route::post("/auth/register2", [AuthController::class, 'register2']);
     Route::post("/auth/register/verify", [AuthController::class, 'verifyUser']);
-    Route::post("/auth/forget-password", [AuthController::class, 'forgetPassword']);
-    Route::post("/auth/forget-password/verify", [AuthController::class, 'forgetPasswordVerifyUser']);
-    Route::post("/auth/forget-password/change-password", [AuthController::class, 'forgetPasswordChangePassword']);
-    Route::post("/auth/bank-account/verify", [AuthController::class, 'verifyBankAccount']);
+    Route::post("/auth/forget_password", [AuthController::class, 'forgetPassword']);
+    Route::post("/auth/forget_password/verify", [AuthController::class, 'forgetPasswordVerifyUser']);
+    Route::post("/auth/forget_password/change_password", [AuthController::class, 'forgetPasswordChangePassword']);
+
 
     Route::get('/fetchTermsAndConditions', [TermsAndConditionController::class, 'fetchTermsAndConditions']);
     Route::middleware('auth:sanctum')->post('/bookings/{booking_id}/assign-technician', [AdminBookingController::class, 'assignNearestTechnician']);
