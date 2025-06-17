@@ -12,11 +12,23 @@ class BookingAssignment extends Model
     protected $fillable = [
         'booking_id',
         'user_id',
-        'status',
+        'status',           // 'assigned', 'rejected', etc.
         'reason',
         'assigned_at',
-        'responded_at'
+        'responded_at',
+        'slot_date',
+        'time_start',
+        'time_end',
     ];
+
+    protected $casts = [
+        'assigned_at'   => 'datetime',
+        'responded_at'  => 'datetime',
+        'slot_date'     => 'date',
+        'time_start'    => 'string',
+        'time_end'      => 'string',
+    ];
+
 
     protected $dates = ['assigned_at', 'responded_at'];
 

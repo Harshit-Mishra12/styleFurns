@@ -18,15 +18,20 @@ return new class extends Migration
             $table->string('name');
             $table->text('damage_desc');
             $table->date('scheduled_date')->nullable();
-            $table->string('status')->default('waiting_approval'); // 'waiting_approval',  'approved', 'scheduled', 'in_progress', 'completed','to_do','cancelled'
+            $table->string('status')->default('waiting_approval'); // waiting_approval, approved, scheduled, in_progress, completed, to_do, cancelled
             $table->foreignId('current_technician_id')->nullable()->constrained('users');
             $table->integer('slots_required')->default(1);
             $table->decimal('price', 10, 2)->nullable();
             $table->foreignId('customer_id')->constrained('customers');
             $table->timestamp('completed_at')->nullable();
-            $table->timestamps();
-
             $table->boolean('is_active')->default(true);
+
+            // ✅ New fields
+            $table->text('remark')->nullable();
+            $table->text('status_comment')->nullable();
+            $table->json('required_skills')->nullable(); // Store array of skill IDs
+
+            $table->timestamps();
             $table->index('scheduled_date');
         });
     }
