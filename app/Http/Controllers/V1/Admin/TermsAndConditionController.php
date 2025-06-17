@@ -5,9 +5,6 @@ namespace App\Http\Controllers\V1\Admin;
 use App\Helpers\Helper;
 use App\Http\Controllers\Controller;
 use App\Models\TermsAndConditions;
-use App\Models\User;
-use App\Models\UserBankDetails;
-use App\Models\UserDocuments;
 use Exception;
 use Illuminate\Http\Request;
 
