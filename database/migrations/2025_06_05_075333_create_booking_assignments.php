@@ -17,11 +17,18 @@ return new class extends Migration
         Schema::create('booking_assignments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('booking_id')->constrained()->onDelete('cascade');
-            $table->foreignId('user_id')->constrained('users')->onDelete('cascade'); //technician
-            $table->string('status'); //'assigned', 'rejected', 'rescheduled', 'left', 'busy', 'accepted'
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade'); // technician
+            $table->string('status'); // 'assigned', 'rejected', 'rescheduled', 'left', 'busy', 'accepted'
             $table->text('reason')->nullable();
+            $table->text('comment')->nullable();
             $table->timestamp('assigned_at')->nullable();
             $table->timestamp('responded_at')->nullable();
+
+            // 🆕 Slot information
+            $table->date('slot_date')->nullable();         // e.g. 2025-06-17
+            $table->time('time_start')->nullable();        // e.g. 10:00
+            $table->time('time_end')->nullable();          // e.g. 13:00
+
             $table->timestamps();
         });
     }

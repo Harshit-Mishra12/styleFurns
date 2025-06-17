@@ -19,32 +19,43 @@ use App\Services\TechnicianAssignmentService;
 class BookingController extends Controller
 {
 
-
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string',
-            'damage_desc' => 'nullable|string',
-            'scheduled_date' => 'required|date',
-            'customer_name' => 'required|string',
-            'customer_email' => 'nullable|email',
-            'customer_phone' => 'required|string',
-            'customer_address' => 'required|string',
-            'customer_area' => 'required|string',
-            'customer_latitude' => 'nullable|numeric|between:-90,90',
+            'name'               => 'required|string',
+            'damage_desc'        => 'nullable|string',
+            'scheduled_date'     => 'required|date',
+            'customer_name'      => 'required|string',
+            'customer_email'     => 'nullable|email',
+            'customer_phone'     => 'required|string',
+            'customer_address'   => 'required|string',
+            'customer_area'      => 'required|string',
+            'customer_latitude'  => 'nullable|numeric|between:-90,90',
             'customer_longitude' => 'nullable|numeric|between:-180,180',
-            'parts' => 'nullable|array',
-            'parts.*.name' => 'required_with:parts|string',
-            'parts.*.serial_number' => 'required_with:parts|string',
-            'parts.*.quantity'      => 'nullable|numeric|min:0.01',
-            'parts.*.unit_type'     => 'nullable|in:unit,gram,kg,ml,liter,meter',
-            'parts.*.price'         => 'nullable|numeric|min:0',
-            'parts.*.provided_by'   => 'nullable|in:admin,technician,customer,unknown',
-            'parts.*.is_provided'   => 'nullable|boolean',
-            'parts.*.is_required'   => 'nullable|boolean',
-            'parts.*.notes'         => 'nullable|string|max:1000',
-            'before_images' => 'required|array',
-            'before_images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048'
+            'remark'             => 'nullable|string|max:1000',
+            'status_comment'     => 'nullable|string|max:1000',
+            'required_skills'    => 'nullable|array',
+            'required_skills.*'  => 'exists:skills,id',
+
+            'selected_slot'                => 'nullable|array',
+            'selected_slot.technician_id' => 'required_with:selected_slot|exists:users,id',
+            'selected_slot.date'          => 'required_with:selected_slot|date',
+            'selected_slot.time_start'    => 'required_with:selected_slot|date_format:H:i',
+            'selected_slot.time_end'      => 'required_with:selected_slot|date_format:H:i',
+
+            'parts'                       => 'nullable|array',
+            'parts.*.name'                => 'required_with:parts|string',
+            'parts.*.serial_number'       => 'required_with:parts|string',
+            'parts.*.quantity'            => 'nullable|numeric|min:0.01',
+            'parts.*.unit_type'           => 'nullable|in:unit,gram,kg,ml,liter,meter',
+            'parts.*.price'               => 'nullable|numeric|min:0',
+            'parts.*.provided_by'         => 'nullable|in:admin,technician,customer,unknown',
+            'parts.*.is_provided'         => 'nullable|boolean',
+            'parts.*.is_required'         => 'nullable|boolean',
+            'parts.*.notes'               => 'nullable|string|max:1000',
+
+            'before_images'               => 'required|array',
+            'before_images.*'             => 'image|mimes:jpeg,png,jpg,gif|max:2048'
         ]);
 
         DB::beginTransaction();
@@ -52,29 +63,32 @@ class BookingController extends Controller
         try {
             // 1. Create customer
             $customer = Customer::create([
-                'name' => $request->customer_name,
-                'email' => $request->customer_email,
-                'phone' => $request->customer_phone,
-                'address' => $request->customer_address,
-                'latitude' => $request->customer_latitude,
+                'name'      => $request->customer_name,
+                'email'     => $request->customer_email,
+                'phone'     => $request->customer_phone,
+                'address'   => $request->customer_address,
+                'latitude'  => $request->customer_latitude,
                 'longitude' => $request->customer_longitude,
-                'area' => $request->customer_area,
+                'area'      => $request->customer_area,
             ]);
 
             // 2. Create booking
             $booking = Booking::create([
-                'name' => $request->name,
-                'damage_desc' => $request->damage_desc,
-                'scheduled_date' => $request->scheduled_date,
-                'status' => 'waiting_approval',
-                'slots_required' => 1,
-                'price' => 0.00,
-                'customer_id' => $customer->id,
-                'is_active' => false,
+                'name'              => $request->name,
+                'damage_desc'       => $request->damage_desc,
+                'scheduled_date'    => $request->scheduled_date,
+                'status'            => 'waiting_approval',
+                'current_technician_id' => $request->selected_slot['technician_id'] ?? null,
+                'slots_required'    => 1,
+                'price'             => 0.00,
+                'customer_id'       => $customer->id,
+                'is_active'         => false,
+                'remark'            => $request->remark,
+                'status_comment'    => $request->status_comment,
+                'required_skills'   => $request->required_skills,
             ]);
 
-            // 3. Add parts with serial numbers
-            // 3. Add parts with full part tracking
+            // 3. Add parts
             if ($request->has('parts')) {
                 foreach ($request->parts as $part) {
                     BookingPart::create([
@@ -85,7 +99,7 @@ class BookingController extends Controller
                         'unit_type'     => $part['unit_type'] ?? 'unit',
                         'price'         => $part['price'] ?? null,
                         'added_by'      => auth()->id(),
-                        'added_source'  => 'admin', // since this is admin-triggered
+                        'added_source'  => 'admin',
                         'provided_by'   => $part['provided_by'] ?? 'unknown',
                         'is_provided'   => isset($part['is_provided']) ? (bool) $part['is_provided'] : false,
                         'is_required'   => isset($part['is_required']) ? (bool) $part['is_required'] : true,
@@ -94,39 +108,49 @@ class BookingController extends Controller
                 }
             }
 
-
-            // 4. Save all before images
+            // 4. Save before images
             if ($request->hasFile('before_images')) {
                 foreach ($request->file('before_images') as $imageFile) {
-
                     $imageUrl = Helper::saveImageToServer($imageFile, 'uploads/bookings/');
                     BookingImage::create([
-                        'booking_id' => $booking->id,
-                        'image_url' => $imageUrl,
-                        'type' => 'before',
+                        'booking_id'  => $booking->id,
+                        'image_url'   => $imageUrl,
+                        'type'        => 'before',
                         'uploaded_by' => auth()->id(),
                     ]);
                 }
+            }
+
+            // 5. If selected_slot is present, assign technician
+            if ($request->has('selected_slot')) {
+                $slot = $request->selected_slot;
+                BookingAssignment::create([
+                    'booking_id'  => $booking->id,
+                    'user_id'     => $slot['technician_id'],
+                    'status'      => 'assigned',
+                    'assigned_at' => now(),
+                    'date'        => $slot['date'],
+                    'time_start'  => $slot['time_start'],
+                    'time_end'    => $slot['time_end'],
+                ]);
             }
 
             DB::commit();
 
             return response()->json([
                 'status_code' => 1,
-                'data' => [
-                    'booking_id' => $booking->id
-                ],
-                'message' => 'Booking created successfully and waiting for admin to make it active.',
+                'data'        => ['booking_id' => $booking->id],
+                'message'     => 'Booking created successfully. Awaiting admin approval.',
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([
                 'status_code' => 2,
-                'data' => [],
-                'message' => 'Booking creation failed: ' . $e->getMessage(),
+                'message'     => 'Booking creation failed: ' . $e->getMessage(),
             ]);
         }
     }
+
     public function index()
     {
         $bookings = Booking::with(['customer', 'parts', 'images', 'technician'])
@@ -147,7 +171,7 @@ class BookingController extends Controller
 
         if (!$booking) {
             return response()->json([
-                'status_code' => 0,
+                'status_code' => 2,
                 'data' => [],
                 'message' => 'Booking not found.'
             ]);
@@ -376,7 +400,7 @@ class BookingController extends Controller
             DB::rollBack();
 
             return response()->json([
-                'status_code' => 0,
+                'status_code' => 2,
                 'message' => 'Failed to update booking: ' . $e->getMessage(),
                 'data' => []
             ]);

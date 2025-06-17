@@ -19,8 +19,20 @@ class Booking extends Model
         'price',
         'customer_id',
         'completed_at',
-        'is_active'
+        'is_active',
+        'remark',
+        'status_comment',
+        'required_skills',
     ];
+
+    protected $casts = [
+        'scheduled_date' => 'date',
+        'completed_at'   => 'datetime',
+        'is_active'      => 'boolean',
+        'required_skills' => 'array', // 🔁 Casts JSON to PHP array
+    ];
+
+
 
     protected $dates = ['scheduled_date', 'completed_at'];
 
