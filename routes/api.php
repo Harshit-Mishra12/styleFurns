@@ -51,6 +51,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/bookings/fetch', [AdminBookingController::class, 'index']);
             Route::get('/bookings/fetch/{id}', [AdminBookingController::class, 'show']);
             Route::post('/bookings/{booking_id}/update', [AdminBookingController::class, 'update']);
+            Route::get('/available_slots/fetch', [AdminBookingController::class, 'getAvailableSlots']);
+
             // Transaction Handling (Admin can view all transactions)
 
         });
@@ -60,6 +62,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/technician/status', [TechnicianProfileController::class, 'updateJobStatus']);
             Route::post('/technician/location', [TechnicianProfileController::class, 'updateLocation']);
             Route::post('/bookings/{booking_id}/assignment/status', [UserBookingController::class, 'updateAssignmentStatus']);
+
+
 
             Route::post('/bookings/{booking_id}/images/upload', [UserBookingController::class, 'uploadBookingImages']);
         });
