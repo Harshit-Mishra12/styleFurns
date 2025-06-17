@@ -9,6 +9,7 @@ use App\Models\BookingAssignment;
 use App\Models\BookingImage;
 use App\Models\BookingPart;
 use App\Models\Customer;
+use App\Models\User;
 use App\Services\BookingPartsService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -405,5 +406,47 @@ class BookingController extends Controller
                 'data' => []
             ]);
         }
+    }
+
+
+
+
+    public function getAvailableSlots(Request $request)
+    {
+
+        // In production: Validate location inputs
+        $latitude = $request->get('latitude');   // e.g. 19.0760
+        $longitude = $request->get('longitude'); // e.g. 72.8777
+
+        // 1. Fetch nearby technicians with role = technician (you can filter by skill/availability/etc.)
+        // This is dummy for now. Replace with actual location-based filtering later.
+        $technicians = User::where('role', 'technician')->take(3)->get();
+
+        // 2. Dummy booked slot data for now
+        $dummyBookedSlots = [
+            ['date' => '2023-10-01', 'time' => '10:00 AM'],
+            ['date' => '2023-10-01', 'time' => '11:00 AM'],
+            ['date' => '2023-10-01', 'time' => '12:00 PM'],
+        ];
+
+        // 3. Create dummy slot response
+        $results = [];
+
+        foreach ($technicians as $index => $technician) {
+            $results[] = [
+                'technician'  => $technician,
+                'totalScore'  => 500 - ($index * 50),
+                'skillScore'  => (2 + $index) / 5,
+                'distance'    => (5 + $index * 3) . ' km',
+                'freeSlots'   => 5 - $index,
+                'bookedSlots' => $dummyBookedSlots,
+            ];
+        }
+
+        return response()->json([
+            'status_code' => 1,
+            'message' => 'Nearby technician slots fetched successfully.',
+            'data' => $results,
+        ]);
     }
 }
