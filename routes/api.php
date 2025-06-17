@@ -11,6 +11,7 @@ use App\Http\Controllers\V1\Admin\TransactionController;
 use App\Http\Controllers\V1\BookingPartsController;
 use App\Http\Controllers\V1\User\TechnicianProfileController;
 use App\Http\Controllers\V1\Admin\BookingController as AdminBookingController;
+use App\Http\Controllers\V1\Admin\SkillController;
 use App\Http\Controllers\V1\User\BookingController as UserBookingController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -35,7 +36,7 @@ Route::prefix('v1')->group(function () {
     Route::post("/auth/forget_password/verify", [AuthController::class, 'forgetPasswordVerifyUser']);
     Route::post("/auth/forget_password/change_password", [AuthController::class, 'forgetPasswordChangePassword']);
 
-
+    Route::get("/skills/fetch", [SkillController::class, 'index']);
     Route::get('/fetchTermsAndConditions', [TermsAndConditionController::class, 'fetchTermsAndConditions']);
     Route::middleware('auth:sanctum')->post('/bookings/{booking_id}/assign-technician', [AdminBookingController::class, 'assignNearestTechnician']);
     Route::middleware('auth:sanctum')->post('/bookings/{booking_id}/parts/add', [BookingPartsController::class, 'addMissingParts']);

@@ -11,8 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
@@ -94,84 +93,178 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
-
         $request->validate([
-            'name'            => 'required|string|max:255',
-            'email'           => 'required|email',
-            'mobile'          => 'required|digits:10',
-            'password'        => 'required|min:6|confirmed',
-            'profile_picture' => 'nullable|file|mimes:jpeg,jpg,png|max:2048',
-            'role'            => 'nullable|string',
+            'name'              => 'required|string|max:255',
+            'email'             => 'required|email',
+            'mobile'            => 'required|digits:10',
+            'password'          => 'required|min:6|confirmed',
+            'profile_picture'   => 'nullable|file|mimes:jpeg,jpg,png|max:2048',
+            'role'              => 'nullable|string',
+            'technician_skills' => 'nullable|array',
+            'technician_skills.*' => 'integer|exists:skills,id',
         ]);
 
-
-
-        // Check existing user by mobile or email
         $existingUser = User::where(function ($query) use ($request) {
             $query->where('mobile', $request->mobile)
                 ->orWhere('email', $request->email);
         })->first();
 
-        // If user is verified, block registration
-        if ($existingUser && $existingUser->is_verified) {
-            return response()->json([
-                'status_code' => 2,
-                'message' => 'User already registered. Please login.',
-            ]);
-        }
-
-        // Upload profile picture
         $profilePicturePath = null;
         if ($request->hasFile('profile_picture')) {
             $profilePicturePath = Helper::saveImageToServer($request->file('profile_picture'), 'uploads/profile/');
         }
 
-        // Generate random 4-digit OTP and expiry (e.g., 10 minutes)
         $otp = random_int(1000, 9999);
         $otpExpiresAt = Carbon::now()->addMinutes(10);
 
-        if ($existingUser) {
-            // Overwrite existing non-verified user
-            $existingUser->name            = $request->name;
-            $existingUser->email           = $request->email;
-            $existingUser->mobile          = $request->mobile;
-            $existingUser->password        = bcrypt($request->password);
-            $existingUser->profile_picture = $profilePicturePath;
-            $existingUser->role            = $request->role ?? 'user';
-            $existingUser->otp             = $otp;
-            $existingUser->otp_expires_at  = $otpExpiresAt;
-            $existingUser->is_verified     = false;
-            $existingUser->save();
+        DB::beginTransaction();
+
+        try {
+            if ($existingUser) {
+                $existingUser->name            = $request->name;
+                $existingUser->email           = $request->email;
+                $existingUser->mobile          = $request->mobile;
+                $existingUser->password        = bcrypt($request->password);
+                $existingUser->profile_picture = $profilePicturePath;
+                $existingUser->role            = $request->role ?? 'user';
+                $existingUser->otp             = $otp;
+                $existingUser->otp_expires_at  = $otpExpiresAt;
+                $existingUser->is_verified     = false;
+                $existingUser->save();
+
+                if ($existingUser->role === 'technician' && $request->filled('technician_skills')) {
+                    $existingUser->skills()->sync($request->technician_skills);
+                }
+
+                DB::commit();
+
+                return response()->json([
+                    'status_code' => 1,
+                    'message'     => 'User registered successfully. Please verify OTP.',
+                    'otp'         => $otp,
+                    'data'        => ['id' => $existingUser->id],
+                ]);
+            }
+
+            // New user
+            $user = User::create([
+                'name'            => $request->name,
+                'email'           => $request->email,
+                'mobile'          => $request->mobile,
+                'password'        => bcrypt($request->password),
+                'profile_picture' => $profilePicturePath,
+                'role'            => $request->role ?? 'user',
+                'otp'             => $otp,
+                'status'          => 'active',
+                'otp_expires_at'  => $otpExpiresAt,
+                'is_verified'     => false,
+            ]);
+
+            if ($user->role === 'technician' && $request->filled('technician_skills')) {
+                $user->skills()->sync($request->technician_skills);
+            }
+
+            DB::commit();
 
             return response()->json([
                 'status_code' => 1,
                 'message'     => 'User registered successfully. Please verify OTP.',
-                'otp'         => $otp,   // For testing, remove in production
-                'data'        => ['id' => $existingUser->id],
+                'otp'         => $otp,
+                'data'        => ['id' => $user->id],
             ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status_code' => 0,
+                'message' => 'Registration failed.',
+                'error'   => $e->getMessage(),
+            ], 500);
         }
-
-        // Create new user with OTP
-        $user = User::create([
-            'name'            => $request->name,
-            'email'           => $request->email,
-            'mobile'          => $request->mobile,
-            'password'        => bcrypt($request->password),
-            'profile_picture' => $profilePicturePath,
-            'role'            => $request->role ?? 'user',
-            'otp'             => $otp,
-            'status'          => 'active',
-            'otp_expires_at'  => $otpExpiresAt,
-            'is_verified'     => false,
-        ]);
-
-        return response()->json([
-            'status_code' => 1,
-            'message'     => 'User registered successfully. Please verify OTP.',
-            'otp'         => $otp,   // For testing, remove in production
-            'data'        => ['id' => $user->id],
-        ]);
     }
+
+
+    // public function register(Request $request)
+    // {
+
+    //     $request->validate([
+    //         'name'            => 'required|string|max:255',
+    //         'email'           => 'required|email',
+    //         'mobile'          => 'required|digits:10',
+    //         'password'        => 'required|min:6|confirmed',
+    //         'profile_picture' => 'nullable|file|mimes:jpeg,jpg,png|max:2048',
+    //         'role'            => 'nullable|string',
+    //     ]);
+
+
+
+    //     // Check existing user by mobile or email
+    //     $existingUser = User::where(function ($query) use ($request) {
+    //         $query->where('mobile', $request->mobile)
+    //             ->orWhere('email', $request->email);
+    //     })->first();
+
+    //     // If user is verified, block registration
+    //     if ($existingUser && $existingUser->is_verified) {
+    //         return response()->json([
+    //             'status_code' => 2,
+    //             'message' => 'User already registered. Please login.',
+    //         ]);
+    //     }
+
+    //     // Upload profile picture
+    //     $profilePicturePath = null;
+    //     if ($request->hasFile('profile_picture')) {
+    //         $profilePicturePath = Helper::saveImageToServer($request->file('profile_picture'), 'uploads/profile/');
+    //     }
+
+    //     // Generate random 4-digit OTP and expiry (e.g., 10 minutes)
+    //     $otp = random_int(1000, 9999);
+    //     $otpExpiresAt = Carbon::now()->addMinutes(10);
+
+    //     if ($existingUser) {
+    //         // Overwrite existing non-verified user
+    //         $existingUser->name            = $request->name;
+    //         $existingUser->email           = $request->email;
+    //         $existingUser->mobile          = $request->mobile;
+    //         $existingUser->password        = bcrypt($request->password);
+    //         $existingUser->profile_picture = $profilePicturePath;
+    //         $existingUser->role            = $request->role ?? 'user';
+    //         $existingUser->otp             = $otp;
+    //         $existingUser->otp_expires_at  = $otpExpiresAt;
+    //         $existingUser->is_verified     = false;
+    //         $existingUser->save();
+
+    //         return response()->json([
+    //             'status_code' => 1,
+    //             'message'     => 'User registered successfully. Please verify OTP.',
+    //             'otp'         => $otp,   // For testing, remove in production
+    //             'data'        => ['id' => $existingUser->id],
+    //         ]);
+    //     }
+
+    //     // Create new user with OTP
+    //     $user = User::create([
+    //         'name'            => $request->name,
+    //         'email'           => $request->email,
+    //         'mobile'          => $request->mobile,
+    //         'password'        => bcrypt($request->password),
+    //         'profile_picture' => $profilePicturePath,
+    //         'role'            => $request->role ?? 'user',
+    //         'otp'             => $otp,
+    //         'status'          => 'active',
+    //         'otp_expires_at'  => $otpExpiresAt,
+    //         'is_verified'     => false,
+    //     ]);
+
+
+
+    //     return response()->json([
+    //         'status_code' => 1,
+    //         'message'     => 'User registered successfully. Please verify OTP.',
+    //         'otp'         => $otp,   // For testing, remove in production
+    //         'data'        => ['id' => $user->id],
+    //     ]);
+    // }
 
 
 

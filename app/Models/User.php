@@ -60,4 +60,10 @@ class User extends Authenticatable
     {
         return $this->hasOne(TechnicianArea::class, 'user_id');
     }
+
+    // User.php
+    public function skills()
+    {
+        return $this->belongsToMany(Skill::class, 'technician_skills', 'user_id', 'skill_id');
+    }
 }
