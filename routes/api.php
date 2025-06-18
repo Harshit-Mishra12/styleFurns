@@ -50,8 +50,9 @@ Route::prefix('v1')->group(function () {
             Route::post('/bookings/create', [AdminBookingController::class, 'store']);
             Route::get('/bookings/fetch', [AdminBookingController::class, 'index']);
             Route::get('/bookings/fetch/{id}', [AdminBookingController::class, 'show']);
-            Route::post('/bookings/{booking_id}/update', [AdminBookingController::class, 'update']);
+            Route::post('/bookings/{booking_id}/update', [AdminBookingController::class, 'updateBooking']);
             Route::get('/available_slots/fetch', [AdminBookingController::class, 'getAvailableSlots']);
+            Route::get('/bookings/stats', [AdminBookingController::class, 'getStats']);
 
             // Transaction Handling (Admin can view all transactions)
 

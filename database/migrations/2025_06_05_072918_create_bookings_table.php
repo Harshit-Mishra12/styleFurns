@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('name');
             $table->text('damage_desc');
             $table->date('scheduled_date')->nullable();
-            $table->string('status')->default('waiting_approval'); // waiting_approval, approved, scheduled, in_progress, completed, to_do, cancelled
+            $table->string('status')->default('waiting_approval'); // 'pending', 'completed','waiting_approval', 'waiting_parts','rescheduling_required', 'cancelled',
             $table->foreignId('current_technician_id')->nullable()->constrained('users');
             $table->integer('slots_required')->default(1);
             $table->decimal('price', 10, 2)->nullable();

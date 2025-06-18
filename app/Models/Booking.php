@@ -74,6 +74,10 @@ class Booking extends Model
             ->latestOfMany('assigned_at');
     }
 
+    public function bookingAssignments()
+    {
+        return $this->hasMany(BookingAssignment::class, 'booking_id');
+    }
 
     // public function incompleteReason()
     // {
