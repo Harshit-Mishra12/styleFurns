@@ -74,11 +74,12 @@ class BookingController extends Controller
             ]);
 
             // 2. Create booking
+            $status = $request->has('selected_slot') ? 'pending' : 'waiting_approval';
             $booking = Booking::create([
                 'name'              => $request->name,
                 'damage_desc'       => $request->damage_desc,
                 'scheduled_date'    => $request->scheduled_date,
-                'status'            => 'waiting_approval',
+                'status'            => $status,
                 'current_technician_id' => $request->selected_slot['technician_id'] ?? null,
                 'slots_required'    => 1,
                 'price'             => 0.00,
@@ -130,7 +131,7 @@ class BookingController extends Controller
                     'user_id'     => $slot['technician_id'],
                     'status'      => 'assigned',
                     'assigned_at' => now(),
-                    'date'        => $slot['date'],
+                    'slot_date'        => $slot['date'],
                     'time_start'  => $slot['time_start'],
                     'time_end'    => $slot['time_end'],
                 ]);
@@ -152,20 +153,50 @@ class BookingController extends Controller
         }
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $bookings = Booking::with(['customer', 'parts', 'images', 'technician'])
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $query = Booking::with([
+            'customer',
+            'parts',
+            'images',
+            'technician',
+            'bookingAssignments' // <- Add this line
+        ])->orderBy('created_at', 'desc');
+
+        // Optional status filter
+        if ($request->filled('status')) {
+            $validStatuses = [
+                'pending',
+                'completed',
+                'waiting_approval',
+                'waiting_parts',
+                'rescheduling_required',
+                'cancelled',
+            ];
+
+            if (in_array($request->status, $validStatuses)) {
+                $query->where('status', $request->status);
+            } else {
+                return response()->json([
+                    'status_code' => 0,
+                    'message' => 'Invalid status filter.',
+                ], 400);
+            }
+        }
+
+        $bookings = $query->get();
 
         return response()->json([
             'status_code' => 1,
             'data' => [
                 'bookings' => $bookings
             ],
-            'message' => 'All bookings fetched successfully.'
+            'message' => 'Bookings fetched successfully.'
         ]);
     }
+
+
+
     public function show($id)
     {
         $booking = Booking::with(['customer', 'parts', 'images', 'technician', 'technicianHistory.user'])->find($id);
@@ -258,156 +289,178 @@ class BookingController extends Controller
         ]);
     }
 
-    public function update(Request $request, $booking_id)
+    public function updateBooking(Request $request, $id)
     {
-
-        dd($request->all());
-
+        $booking = Booking::with(['customer', 'images'])->findOrFail($id);
 
         $request->validate([
-            // Booking Fields
-            'name' => 'nullable|string',
-            'damage_desc' => 'nullable|string',
-            'scheduled_date' => 'nullable|date',
-            'status' => 'nullable|string',
-            'price' => 'nullable|numeric',
-            'is_active' => 'nullable|boolean',
+            'name'               => 'sometimes|required|string',
+            'damage_desc'        => 'nullable|string',
+            'scheduled_date'     => 'sometimes|required|date',
+            'remark'             => 'nullable|string|max:1000',
+            'status_comment'     => 'nullable|string|max:1000',
+            'required_skills'    => 'nullable|array',
+            'required_skills.*'  => 'exists:skills,id',
 
-            // Customer Fields
-            'customer' => 'nullable|array',
-            'customer.name' => 'nullable|string',
-            'customer.email' => 'nullable|email',
-            'customer.phone' => 'nullable|string',
-            'customer.address' => 'nullable|string',
-            'customer.area' => 'nullable|string',
-            'customer.latitude' => 'nullable|numeric',
-            'customer.longitude' => 'nullable|numeric',
+            'technician_id'      => 'nullable|exists:users,id',
 
-            // Parts
-            'parts' => 'nullable|array',
-            'parts.*.id' => 'nullable|exists:booking_parts,id',
-            'parts.*.name' => 'required|string',
-            'parts.*.serial_number' => 'nullable|string',
-            'parts.*.quantity' => 'nullable|numeric|min:0.01',
-            'parts.*.unit_type' => 'nullable|in:unit,gram,kg,ml,liter,meter',
-            'parts.*.price' => 'nullable|numeric',
+            // Customer fields
+            'customer_name'      => 'sometimes|required|string',
+            'customer_email'     => 'nullable|email',
+            'customer_phone'     => 'sometimes|required|string',
+            'customer_address'   => 'sometimes|required|string',
+            'customer_area'      => 'sometimes|required|string',
+            'customer_latitude'  => 'nullable|numeric|between:-90,90',
+            'customer_longitude' => 'nullable|numeric|between:-180,180',
+
+            'parts'              => 'nullable|array',
+            'parts.*.id'         => 'nullable|exists:booking_parts,id',
+            'parts.*.name'       => 'required_with:parts|string',
+            'parts.*.serial_number' => 'required_with:parts|string',
+            'parts.*.quantity'   => 'nullable|numeric|min:0.01',
+            'parts.*.unit_type'  => 'nullable|in:unit,gram,kg,ml,liter,meter',
+            'parts.*.price'      => 'nullable|numeric|min:0',
             'parts.*.provided_by' => 'nullable|in:admin,technician,customer,unknown',
             'parts.*.is_provided' => 'nullable|boolean',
             'parts.*.is_required' => 'nullable|boolean',
-            'parts.*.notes' => 'nullable|string',
+            'parts.*.notes'      => 'nullable|string|max:1000',
 
-            // Images
-            'images' => 'nullable|array',
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
-            'image_type' => 'required_with:images|in:before,after',
-
-            // Assignments
-            'assignments' => 'nullable|array',
-            'assignments.*.id' => 'required|exists:booking_assignments,id',
-            'assignments.*.status' => 'required|string',
-            'assignments.*.reason' => 'nullable|string',
-            'assignments.*.comment' => 'nullable|string',
+            'before_images'      => 'nullable|array',
+            'before_images.*'    => 'image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         DB::beginTransaction();
 
         try {
-            $booking = Booking::with('customer')->findOrFail($booking_id);
+            $updatedFields = [];
 
-            // Booking Update
-            $booking->update($request->only([
+            // Update booking core fields
+            $fieldsToUpdate = array_filter($request->only([
                 'name',
                 'damage_desc',
                 'scheduled_date',
-                'status',
-                'price',
-                'is_active'
+                'remark',
+                'status_comment',
             ]));
-
-            // Customer Update
-            if ($request->has('customer')) {
-                $booking->customer->update($request->customer);
+            if (!empty($fieldsToUpdate)) {
+                $booking->update($fieldsToUpdate);
+                $updatedFields = array_merge($updatedFields, array_keys($fieldsToUpdate));
             }
 
-            // Parts Update / Add
+            // Technician assignment
+            if ($request->filled('technician_id') && $booking->current_technician_id != $request->technician_id) {
+                $booking->current_technician_id = $request->technician_id;
+                $booking->save();
+                $updatedFields[] = 'technician_id';
+            }
 
+            // Required skills
+            if ($request->has('required_skills')) {
+                $booking->required_skills = $request->required_skills;
+                $booking->save();
+                $updatedFields[] = 'required_skills';
+            }
 
-            if ($request->has('parts')) {
-                foreach ($request->parts as $part) {
-                    if (!empty($part['id'])) {
-                        BookingPart::where('id', $part['id'])->update([
-                            'part_name' => $part['name'],
-                            'serial_number' => $part['serial_number'] ?? null,
-                            'quantity' => $part['quantity'] ?? 1,
-                            'unit_type' => $part['unit_type'] ?? 'unit',
-                            'price' => $part['price'] ?? null,
-                            'provided_by' => $part['provided_by'] ?? 'unknown',
-                            'is_provided' => $part['is_provided'] ?? false,
-                            'is_required' => $part['is_required'] ?? true,
-                            'notes' => $part['notes'] ?? null,
-                        ]);
-                    } else {
-                        BookingPart::create([
-                            'booking_id' => $booking->id,
-                            'part_name' => $part['name'],
-                            'serial_number' => $part['serial_number'] ?? null,
-                            'quantity' => $part['quantity'] ?? 1,
-                            'unit_type' => $part['unit_type'] ?? 'unit',
-                            'price' => $part['price'] ?? null,
-                            'provided_by' => $part['provided_by'] ?? 'unknown',
-                            'is_provided' => $part['is_provided'] ?? false,
-                            'is_required' => $part['is_required'] ?? true,
-                            'notes' => $part['notes'] ?? null,
-                            'added_by' => auth()->id(),
-                            'added_source' => 'admin',
-                        ]);
-                    }
+            // ✅ Update customer data
+            if ($booking->customer) {
+                $customerUpdate = array_filter($request->only([
+                    'customer_name',
+                    'customer_email',
+                    'customer_phone',
+                    'customer_address',
+                    'customer_area',
+                    'customer_latitude',
+                    'customer_longitude',
+                ]));
+
+                if (!empty($customerUpdate)) {
+                    $booking->customer->update([
+                        'name'      => $customerUpdate['customer_name'] ?? $booking->customer->name,
+                        'email'     => $customerUpdate['customer_email'] ?? $booking->customer->email,
+                        'phone'     => $customerUpdate['customer_phone'] ?? $booking->customer->phone,
+                        'address'   => $customerUpdate['customer_address'] ?? $booking->customer->address,
+                        'area'      => $customerUpdate['customer_area'] ?? $booking->customer->area,
+                        'latitude'  => $customerUpdate['customer_latitude'] ?? $booking->customer->latitude,
+                        'longitude' => $customerUpdate['customer_longitude'] ?? $booking->customer->longitude,
+                    ]);
+                    $updatedFields[] = 'customer';
                 }
             }
 
-            // Images Upload
-            if ($request->hasFile('images')) {
-                foreach ($request->file('images') as $imageFile) {
+            // 🔁 Sync parts
+            if ($request->has('parts')) {
+                $incomingPartIds = collect($request->parts)->pluck('id')->filter()->toArray();
+                $existingParts = $booking->parts()->pluck('id')->toArray();
+
+                // Delete removed parts
+                $partsToDelete = array_diff($existingParts, $incomingPartIds);
+                BookingPart::whereIn('id', $partsToDelete)->delete();
+
+                // Create or update parts
+                foreach ($request->parts as $partData) {
+                    $partAttributes = [
+                        'part_name'     => $partData['name'],
+                        'serial_number' => $partData['serial_number'] ?? null,
+                        'quantity'      => $partData['quantity'] ?? 1,
+                        'unit_type'     => $partData['unit_type'] ?? 'unit',
+                        'price'         => $partData['price'] ?? null,
+                        'added_by'      => auth()->id(),
+                        'added_source'  => 'admin',
+                        'provided_by'   => $partData['provided_by'] ?? 'unknown',
+                        'is_provided'   => $partData['is_provided'] ?? false,
+                        'is_required'   => $partData['is_required'] ?? true,
+                        'notes'         => $partData['notes'] ?? null,
+                    ];
+
+                    if (!empty($partData['id'])) {
+                        BookingPart::where('id', $partData['id'])->update($partAttributes);
+                    } else {
+                        $booking->parts()->create($partAttributes);
+                    }
+                }
+
+                $updatedFields[] = 'parts';
+            }
+
+            // 📷 Replace before_images
+            if ($request->hasFile('before_images')) {
+                // Delete existing before images from DB and optionally from disk
+                $oldImages = $booking->images()->where('type', 'before')->get();
+                foreach ($oldImages as $img) {
+                    // Optionally delete from storage: Storage::delete($img->image_url);
+                    $img->delete();
+                }
+
+                foreach ($request->file('before_images') as $imageFile) {
                     $imageUrl = Helper::saveImageToServer($imageFile, 'uploads/bookings/');
                     BookingImage::create([
-                        'booking_id' => $booking->id,
-                        'image_url' => $imageUrl,
-                        'type' => $request->image_type,
+                        'booking_id'  => $booking->id,
+                        'image_url'   => $imageUrl,
+                        'type'        => 'before',
                         'uploaded_by' => auth()->id(),
                     ]);
                 }
-            }
 
-            // Booking Assignment Updates
-            if ($request->has('assignments')) {
-                foreach ($request->assignments as $a) {
-                    BookingAssignment::where('id', $a['id'])->update([
-                        'status' => $a['status'],
-                        'reason' => $a['reason'] ?? null,
-                        'comment' => $a['comment'] ?? null,
-                        'admin_updated_at' => now(),
-                    ]);
-                }
+                $updatedFields[] = 'before_images';
             }
 
             DB::commit();
 
             return response()->json([
-                'status_code' => 1,
-                'message' => 'Booking and related data updated successfully.',
-                'data' => $booking->fresh(['customer', 'parts', 'images', 'assignments'])
+                'status_code'    => 1,
+                'message'        => 'Booking updated successfully.',
+                'updated_fields' => $updatedFields,
+                'data'           => ['booking_id' => $booking->id],
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
 
             return response()->json([
                 'status_code' => 2,
-                'message' => 'Failed to update booking: ' . $e->getMessage(),
-                'data' => []
-            ]);
+                'message'     => 'Update failed: ' . $e->getMessage(),
+            ], 500);
         }
     }
-
 
 
 
@@ -423,11 +476,14 @@ class BookingController extends Controller
         $technicians = User::where('role', 'technician')->take(3)->get();
 
         // 2. Dummy booked slot data for now
+        $today = date('Y-m-d');
+
         $dummyBookedSlots = [
-            ['date' => '2023-10-01', 'time' => '10:00 AM'],
-            ['date' => '2023-10-01', 'time' => '11:00 AM'],
-            ['date' => '2023-10-01', 'time' => '12:00 PM'],
+            ['date' => $today, 'time' => '10:00 AM'],
+            ['date' => $today, 'time' => '11:00 AM'],
+            ['date' => $today, 'time' => '12:00 PM'],
         ];
+
 
         // 3. Create dummy slot response
         $results = [];
@@ -447,6 +503,48 @@ class BookingController extends Controller
             'status_code' => 1,
             'message' => 'Nearby technician slots fetched successfully.',
             'data' => $results,
+        ]);
+    }
+
+    public function getStats(Request $request)
+    {
+        $technicianId = $request->input('technician_id');
+
+        // Define valid booking statuses
+        $allStatuses = [
+            'pending',
+            'completed',
+            'waiting_approval',
+            'waiting_parts',
+            'rescheduling_required',
+            'cancelled'
+        ];
+
+        $statusCounts = [];
+
+        foreach ($allStatuses as $status) {
+            $query = Booking::where('status', $status);
+
+            // If technician_id is present, filter bookings accordingly
+            if (!empty($technicianId)) {
+                $query->where('current_technician_id', $technicianId);
+            }
+
+            $statusCounts[$status] = $query->count();
+        }
+
+        // Get total number of technicians in the system
+        $totalTechnicians = User::where('role', 'technician')->count();
+
+        return response()->json([
+            'status_code' => 1,
+            'message'     => 'Booking status stats fetched successfully.',
+            'data'        => [
+                'status' => $statusCounts,
+                'technicians' => [
+                    'total_technician' => $totalTechnicians,
+                ]
+            ]
         ]);
     }
 }
