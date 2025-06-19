@@ -11,7 +11,9 @@ use App\Http\Controllers\V1\Admin\TransactionController;
 use App\Http\Controllers\V1\BookingPartsController;
 use App\Http\Controllers\V1\User\TechnicianProfileController;
 use App\Http\Controllers\V1\Admin\BookingController as AdminBookingController;
+use App\Http\Controllers\V1\Admin\CustomerController;
 use App\Http\Controllers\V1\Admin\SkillController;
+use App\Http\Controllers\V1\NotificationController;
 use App\Http\Controllers\V1\TechnicianController;
 use App\Http\Controllers\V1\User\BookingController as UserBookingController;
 use Illuminate\Http\Request;
@@ -47,6 +49,12 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->get('/technicians/fetch', [TechnicianController::class, 'index']);
 
     Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/notifications', [NotificationController::class, 'index']);
+        Route::post('/notifications/mark-read', [NotificationController::class, 'markAsRead']);
+    });
+
+
+    Route::middleware('auth:sanctum')->group(function () {
         Route::prefix('admin')->group(function () {
             Route::post('/bookings/create', [AdminBookingController::class, 'store']);
             Route::get('/bookings/fetch', [AdminBookingController::class, 'index']);
@@ -54,6 +62,9 @@ Route::prefix('v1')->group(function () {
             Route::post('/bookings/{booking_id}/update', [AdminBookingController::class, 'updateBooking']);
             Route::get('/available_slots/fetch', [AdminBookingController::class, 'getAvailableSlots']);
             Route::get('/bookings/stats', [AdminBookingController::class, 'getStats']);
+
+            Route::get('/customers/fetch', [CustomerController::class, 'index']);
+
 
             // Transaction Handling (Admin can view all transactions)
 
