@@ -66,4 +66,15 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Skill::class, 'technician_skills', 'user_id', 'skill_id');
     }
+
+
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class, 'current_technician_id');
+    }
+
+    public function technicianAreas()
+    {
+        return $this->hasMany(TechnicianArea::class);
+    }
 }

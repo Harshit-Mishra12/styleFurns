@@ -59,7 +59,7 @@ class TechnicianProfileController extends Controller
         $request->validate([
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
-            'area' => 'required'
+            'area' => 'nullable|string|max:255'
         ]);
 
         $user = Auth::user();
@@ -72,10 +72,12 @@ class TechnicianProfileController extends Controller
             ]);
         }
 
-        $area = \App\Models\TechnicianArea::firstOrNew(['user_id' => $user->id]);
+        // Always insert a new location row
+        $area = new \App\Models\TechnicianArea();
+        $area->user_id = $user->id;
         $area->latitude = $request->latitude;
         $area->longitude = $request->longitude;
-        $area->area = $request->area;
+        $area->area = $request->area; // can be null
         $area->save();
 
         return response()->json([
@@ -83,9 +85,92 @@ class TechnicianProfileController extends Controller
             'data' => [
                 'latitude' => $area->latitude,
                 'longitude' => $area->longitude,
-                'area' => $area->area
+                'area' => $area->area,
             ],
-            'message' => 'Location updated successfully.',
+            'message' => 'Location added successfully.',
+        ]);
+    }
+
+    public function getProfile(Request $request)
+    {
+        $user = Auth::user();
+
+        if ($user->role !== 'technician') {
+            return response()->json([
+                'status_code' => 2,
+                'message' => 'Only technicians can access this profile.',
+            ], 403);
+        }
+
+        // Get latest location
+        $latestLocation = $user->technicianAreas()->latest()->first();
+
+        return response()->json([
+            'status_code' => 1,
+            'data' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'mobile' => $user->mobile,
+                'profile_picture' => $user->profile_picture,
+                'job_status' => $user->job_status,
+                'joined_at' => $user->created_at->toDateString(),
+                'skills' => $user->skills()->pluck('name'),
+                'location' => $latestLocation ? [
+                    'latitude' => $latestLocation->latitude,
+                    'longitude' => $latestLocation->longitude,
+                    'area' => $latestLocation->area,
+                    'updated_at' => $latestLocation->created_at->toDateTimeString(),
+                ] : null
+            ],
+            'message' => 'Technician profile fetched successfully.'
+        ]);
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $user = auth()->user();
+
+        $request->validate([
+            'mobile'          => 'sometimes|string|unique:users,mobile,' . $user->id,
+            'password'        => 'nullable|string|min:6|confirmed',
+            'job_status'      => 'nullable|in:online,offline,engaged',
+            'status'          => 'nullable|in:active,inactive',
+            'profile_picture' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
+
+        if ($request->hasFile('profile_picture')) {
+            $user->profile_picture = Helper::saveImageToServer($request->file('profile_picture'), 'uploads/profile/');
+        }
+
+        if ($request->filled('password')) {
+            $user->password = bcrypt($request->password);
+        }
+
+        // Only update allowed fields
+        $user->fill($request->only([
+            'mobile',
+            'job_status',
+            'status',
+        ]));
+
+        $user->save();
+
+        return response()->json([
+            'status_code' => 1,
+            'message'     => 'Profile updated successfully.',
+            'data'        => [
+                'user' => $user->only([
+                    'id',
+                    'name',
+                    'email',
+                    'mobile',
+                    'profile_picture',
+                    'job_status',
+                    'status',
+                    'role'
+                ])
+            ]
         ]);
     }
 }

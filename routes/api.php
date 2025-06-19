@@ -12,6 +12,7 @@ use App\Http\Controllers\V1\BookingPartsController;
 use App\Http\Controllers\V1\User\TechnicianProfileController;
 use App\Http\Controllers\V1\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\V1\Admin\SkillController;
+use App\Http\Controllers\V1\TechnicianController;
 use App\Http\Controllers\V1\User\BookingController as UserBookingController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -43,7 +44,7 @@ Route::prefix('v1')->group(function () {
 
     Route::middleware('auth:sanctum')->put('/bookings/{booking_id}/parts/{part_id}/update', [BookingPartsController::class, 'update']);
     Route::middleware('auth:sanctum')->get('/bookings/{booking_id}/parts', [BookingPartsController::class, 'index']);
-
+    Route::middleware('auth:sanctum')->get('/technicians/fetch', [TechnicianController::class, 'index']);
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::prefix('admin')->group(function () {
@@ -63,6 +64,9 @@ Route::prefix('v1')->group(function () {
             Route::post('/technician/status', [TechnicianProfileController::class, 'updateJobStatus']);
             Route::post('/technician/location', [TechnicianProfileController::class, 'updateLocation']);
             Route::post('/bookings/{booking_id}/assignment/status', [UserBookingController::class, 'updateAssignmentStatus']);
+            Route::post('/technician/update-profile', [TechnicianProfileController::class, 'updateProfile']);
+            Route::get('/technician/profile/fetch', [TechnicianProfileController::class, 'getProfile']);
+
 
 
 
