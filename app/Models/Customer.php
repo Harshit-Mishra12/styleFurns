@@ -19,8 +19,12 @@ class Customer extends Model
         'longitude'
     ];
 
+    // public function bookings()
+    // {
+    //     return $this->hasMany(Booking::class);
+    // }
     public function bookings()
     {
-        return $this->hasMany(Booking::class);
+        return $this->hasMany(Booking::class, 'customer_id');
     }
 }

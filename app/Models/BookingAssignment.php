@@ -41,4 +41,9 @@ class BookingAssignment extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
+
+    public function technician()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
 }

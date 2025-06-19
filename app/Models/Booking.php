@@ -83,4 +83,6 @@ class Booking extends Model
     // {
     //     return $this->hasOne(BookingIncompleteReason::class);
     // }
+
+
 }

@@ -38,8 +38,30 @@ class Helper
         $filename = rand(10000, 100000) . '_' . time() . '_' . $file->getClientOriginalName();
         $file->move($path, $filename);
 
-        $baseUrl = config('app.url', 'http://localhost/'); // use config fallback
+        //  $baseUrl = config('app.url', 'http://localhost/'); // use config fallback
+        $baseUrl = getenv('APP_URL');
         $filePath = $baseUrl . '/' . $dir . '/' . $filename;
+
+        return $filePath;
+    }
+    public static function saveImageToServer2($file, $dir)
+    {
+        $path = public_path() . $dir;
+        if (!File::exists($path)) {
+            File::makeDirectory($path, 0777, true, true);
+        }
+
+        $filename = rand(10000, 100000) . '_' . time() . '_' . $file->getClientOriginalName();
+        $file->move($path, $filename);
+
+        $baseUrl = getenv('APP_URL');
+        // $baseUrl = 'http://127.0.0.1:8000';
+        // $baseUrl = 'https://admin2.biotaplant.com';
+
+        //  $baseUrl = 'https://paleturquoise-crab-208767.hostingersite.com/runskart/public';
+
+
+        $filePath = $baseUrl . $dir . $filename;
 
         return $filePath;
     }
