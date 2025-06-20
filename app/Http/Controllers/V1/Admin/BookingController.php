@@ -153,6 +153,48 @@ class BookingController extends Controller
         }
     }
 
+    // public function index(Request $request)
+    // {
+    //     $query = Booking::with([
+    //         'customer',
+    //         'parts',
+    //         'images',
+    //         'technician',
+    //         'bookingAssignments' // <- Add this line
+    //     ])->orderBy('created_at', 'desc');
+
+    //     // Optional status filter
+    //     if ($request->filled('status')) {
+    //         $validStatuses = [
+    //             'pending',
+    //             'completed',
+    //             'waiting_approval',
+    //             'waiting_parts',
+    //             'rescheduling_required',
+    //             'cancelled',
+    //         ];
+
+    //         if (in_array($request->status, $validStatuses)) {
+    //             $query->where('status', $request->status);
+    //         } else {
+    //             return response()->json([
+    //                 'status_code' => 0,
+    //                 'message' => 'Invalid status filter.',
+    //             ], 400);
+    //         }
+    //     }
+
+    //     $bookings = $query->get();
+
+    //     return response()->json([
+    //         'status_code' => 1,
+    //         'data' => [
+    //             'bookings' => $bookings
+    //         ],
+    //         'message' => 'Bookings fetched successfully.'
+    //     ]);
+    // }
+
     public function index(Request $request)
     {
         $query = Booking::with([
@@ -160,10 +202,10 @@ class BookingController extends Controller
             'parts',
             'images',
             'technician',
-            'bookingAssignments' // <- Add this line
+            'bookingAssignments'
         ])->orderBy('created_at', 'desc');
 
-        // Optional status filter
+        // 🔍 Optional status filter
         if ($request->filled('status')) {
             $validStatuses = [
                 'pending',
@@ -184,6 +226,11 @@ class BookingController extends Controller
             }
         }
 
+        // 🔍 Optional technician_id filter
+        if ($request->filled('technician_id')) {
+            $query->where('current_technician_id', $request->technician_id);
+        }
+
         $bookings = $query->get();
 
         return response()->json([
@@ -194,6 +241,7 @@ class BookingController extends Controller
             'message' => 'Bookings fetched successfully.'
         ]);
     }
+
 
 
 
