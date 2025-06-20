@@ -96,12 +96,12 @@ class TechnicianProfileController extends Controller
         $technicianId = $request->input('technician_id');
 
         if ($technicianId) {
-            // if ($authUser->role !== 'admin') {
-            //     return response()->json([
-            //         'status_code' => 2,
-            //         'message' => 'Unauthorized to access other technician profiles.',
-            //     ]);
-            // }
+            if ($authUser->role !== 'admin') {
+                return response()->json([
+                    'status_code' => 2,
+                    'message' => 'Unauthorized to access other technician profiles.',
+                ]);
+            }
 
             $user = User::where('id', $technicianId)->where('role', 'technician')->first();
 
@@ -164,7 +164,7 @@ class TechnicianProfileController extends Controller
                 return response()->json([
                     'status_code' => 2,
                     'message' => 'Unauthorized: Only admins can update other technicians.',
-                ], 403);
+                ]);
             }
 
             $user = User::where('id', $technicianId)->where('role', 'technician')->first();
@@ -172,14 +172,14 @@ class TechnicianProfileController extends Controller
                 return response()->json([
                     'status_code' => 2,
                     'message' => 'Technician not found.',
-                ], 404);
+                ]);
             }
         } else {
             if ($authUser->role !== 'technician') {
                 return response()->json([
                     'status_code' => 2,
                     'message' => 'Only technicians can update their own profile.',
-                ], 403);
+                ]);
             }
 
             $user = $authUser;
@@ -222,7 +222,7 @@ class TechnicianProfileController extends Controller
 
         // 🔄 Update technician_skills
         if ($request->has('technician_skills')) {
-            \DB::table('technician_skills')->where('user_id', $user->id)->delete();
+            DB::table('technician_skills')->where('user_id', $user->id)->delete();
 
             $skillsToInsert = [];
             foreach ($request->technician_skills as $skill) {
@@ -235,12 +235,12 @@ class TechnicianProfileController extends Controller
             }
 
             if (!empty($skillsToInsert)) {
-                \DB::table('technician_skills')->insert($skillsToInsert);
+                DB::table('technician_skills')->insert($skillsToInsert);
             }
         }
 
         // 📦 Fetch technician_skills with skill names
-        $technicianSkills = \DB::table('technician_skills')
+        $technicianSkills = DB::table('technician_skills')
             ->join('skills', 'technician_skills.skill_id', '=', 'skills.id')
             ->where('technician_skills.user_id', $user->id)
             ->select(
