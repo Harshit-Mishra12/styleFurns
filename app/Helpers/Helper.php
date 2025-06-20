@@ -26,7 +26,7 @@ class Helper
     }
 
 
-    public static function saveImageToServer($file, $dir)
+    public static function saveImageToServer2($file, $dir)
     {
         $dir = trim($dir, '/'); // clean up the dir input
         $path = public_path($dir); // ✅ this automatically joins public/ with the given path
@@ -44,27 +44,40 @@ class Helper
 
         return $filePath;
     }
-    public static function saveImageToServer2($file, $dir)
+    public static function saveImageToServer($file, $dir)
     {
-        $path = public_path() . $dir;
+        // Normalize and clean up $dir (e.g., 'uploads/bookings/')
+        $relativeDir = trim($dir, '/\\'); // removes leading/trailing slashes
+        $path = public_path($relativeDir);
+
+        // Ensure folder exists
         if (!File::exists($path)) {
             File::makeDirectory($path, 0777, true, true);
         }
 
-        $filename = rand(10000, 100000) . '_' . time() . '_' . $file->getClientOriginalName();
+        // Clean filename
+        $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $extension = $file->getClientOriginalExtension();
+        $safeName = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $originalName);
+
+        $filename = rand(10000, 100000) . '_' . time() . '_' . $safeName . '.' . $extension;
+
+        // Move file
         $file->move($path, $filename);
 
-        $baseUrl = getenv('APP_URL');
-        // $baseUrl = 'http://127.0.0.1:8000';
-        // $baseUrl = 'https://admin2.biotaplant.com';
-
-        //  $baseUrl = 'https://paleturquoise-crab-208767.hostingersite.com/runskart/public';
+        // Get APP_URL correctly and ensure trailing slash is present
+        $baseUrl = rtrim(env('APP_URL', config('app.url')), '/');
 
 
-        $filePath = $baseUrl . $dir . $filename;
 
-        return $filePath;
+        // Build correct public URL
+        $url = $baseUrl . '/public/' . $relativeDir . '/' . $filename;
+
+        return $url;
     }
+
+
+
 
     public static function deleteImageFromServer($filePath)
     {
