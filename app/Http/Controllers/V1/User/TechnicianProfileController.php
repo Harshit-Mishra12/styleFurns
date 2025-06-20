@@ -4,15 +4,12 @@ namespace App\Http\Controllers\V1\User;
 
 use App\Helpers\Helper;
 use App\Http\Controllers\Controller;
-use App\Models\TechnicianArea;
-use Illuminate\Support\Facades\Http;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Models\Booking;
-use App\Models\BookingAssignment;
-use App\Services\BookingPartsService;
-use App\Services\TechnicianAssignmentService;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 
 
 // Functionality	Method Name
@@ -91,18 +88,47 @@ class TechnicianProfileController extends Controller
         ]);
     }
 
+
+
     public function getProfile(Request $request)
     {
-        $user = Auth::user();
+        $authUser = Auth::user();
+        $technicianId = $request->input('technician_id');
 
-        if ($user->role !== 'technician') {
-            return response()->json([
-                'status_code' => 2,
-                'message' => 'Only technicians can access this profile.',
-            ], 403);
+        if ($technicianId) {
+            // if ($authUser->role !== 'admin') {
+            //     return response()->json([
+            //         'status_code' => 2,
+            //         'message' => 'Unauthorized to access other technician profiles.',
+            //     ]);
+            // }
+
+            $user = User::where('id', $technicianId)->where('role', 'technician')->first();
+
+            if (!$user) {
+                return response()->json([
+                    'status_code' => 2,
+                    'message' => 'Technician not found.',
+                ]);
+            }
+        } else {
+            $user = $authUser;
+
+            if ($user->role !== 'technician') {
+                return response()->json([
+                    'status_code' => 2,
+                    'message' => 'Only technicians can access this profile.',
+                ]);
+            }
         }
 
-        // Get latest location
+        // 👇 Manual skill fetch (no relationship)
+        $skills = DB::table('technician_skills')
+            ->join('skills', 'technician_skills.skill_id', '=', 'skills.id')
+            ->where('technician_skills.user_id', $user->id)
+            ->select('technician_skills.id as technician_skill_id', 'skills.id as skill_id', 'skills.name as skill_name')
+            ->get();
+
         $latestLocation = $user->technicianAreas()->latest()->first();
 
         return response()->json([
@@ -115,7 +141,7 @@ class TechnicianProfileController extends Controller
                 'profile_picture' => $user->profile_picture,
                 'job_status' => $user->job_status,
                 'joined_at' => $user->created_at->toDateString(),
-                'skills' => $user->skills()->pluck('name'),
+                'technician_skills' => $skills,
                 'location' => $latestLocation ? [
                     'latitude' => $latestLocation->latitude,
                     'longitude' => $latestLocation->longitude,
@@ -129,26 +155,64 @@ class TechnicianProfileController extends Controller
 
     public function updateProfile(Request $request)
     {
-        $user = auth()->user();
+        $authUser = auth()->user();
+        $technicianId = $request->input('technician_id');
 
-        $request->validate([
-            'mobile'          => 'sometimes|string|unique:users,mobile,' . $user->id,
-            'password'        => 'nullable|string|min:6|confirmed',
-            'job_status'      => 'nullable|in:online,offline,engaged',
-            'status'          => 'nullable|in:active,inactive',
-            'profile_picture' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
-        ]);
+        // Determine target technician
+        if ($technicianId) {
+            if ($authUser->role !== 'admin') {
+                return response()->json([
+                    'status_code' => 2,
+                    'message' => 'Unauthorized: Only admins can update other technicians.',
+                ], 403);
+            }
 
-        if ($request->hasFile('profile_picture')) {
-            $user->profile_picture = Helper::saveImageToServer($request->file('profile_picture'), 'uploads/profile/');
+            $user = User::where('id', $technicianId)->where('role', 'technician')->first();
+            if (!$user) {
+                return response()->json([
+                    'status_code' => 2,
+                    'message' => 'Technician not found.',
+                ], 404);
+            }
+        } else {
+            if ($authUser->role !== 'technician') {
+                return response()->json([
+                    'status_code' => 2,
+                    'message' => 'Only technicians can update their own profile.',
+                ], 403);
+            }
+
+            $user = $authUser;
         }
 
+        // Validation
+        $request->validate([
+            'mobile'             => 'sometimes|string|unique:users,mobile,' . $user->id,
+            'password'           => 'nullable|string|min:6|confirmed',
+            'job_status'         => 'nullable|in:online,offline,engaged',
+            'status'             => 'nullable|in:active,inactive',
+            'profile_picture'    => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'name'               => 'nullable|string|max:255',
+            'technician_skills'  => 'nullable|array',
+            'technician_skills.*.skill_id' => 'required|exists:skills,id',
+        ]);
+
+        // Profile picture
+        if ($request->hasFile('profile_picture')) {
+            $user->profile_picture = Helper::saveImageToServer(
+                $request->file('profile_picture'),
+                'uploads/profile/'
+            );
+        }
+
+        // Password
         if ($request->filled('password')) {
             $user->password = bcrypt($request->password);
         }
 
-        // Only update allowed fields
+        // Update basic profile fields
         $user->fill($request->only([
+            'name',
             'mobile',
             'job_status',
             'status',
@@ -156,9 +220,39 @@ class TechnicianProfileController extends Controller
 
         $user->save();
 
+        // 🔄 Update technician_skills
+        if ($request->has('technician_skills')) {
+            \DB::table('technician_skills')->where('user_id', $user->id)->delete();
+
+            $skillsToInsert = [];
+            foreach ($request->technician_skills as $skill) {
+                $skillsToInsert[] = [
+                    'user_id'    => $user->id,
+                    'skill_id'   => $skill['skill_id'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+
+            if (!empty($skillsToInsert)) {
+                \DB::table('technician_skills')->insert($skillsToInsert);
+            }
+        }
+
+        // 📦 Fetch technician_skills with skill names
+        $technicianSkills = \DB::table('technician_skills')
+            ->join('skills', 'technician_skills.skill_id', '=', 'skills.id')
+            ->where('technician_skills.user_id', $user->id)
+            ->select(
+                'technician_skills.id as technician_skill_id',
+                'skills.id as skill_id',
+                'skills.name as skill_name'
+            )
+            ->get();
+
         return response()->json([
             'status_code' => 1,
-            'message'     => 'Profile updated successfully.',
+            'message'     => 'Technician profile updated successfully.',
             'data'        => [
                 'user' => $user->only([
                     'id',
@@ -169,8 +263,74 @@ class TechnicianProfileController extends Controller
                     'job_status',
                     'status',
                     'role'
-                ])
+                ]),
+                'technician_skills' => $technicianSkills
             ]
+        ]);
+    }
+
+
+    public function getJourney(Request $request)
+    {
+        $authUser = Auth::user();
+        $technicianId = $request->input('technician_id');
+
+        if ($technicianId) {
+            if ($authUser->role !== 'admin') {
+                return response()->json([
+                    'status_code' => 2,
+                    'message' => 'Unauthorized access.',
+                ]);
+            }
+
+            $user = User::where('id', $technicianId)->where('role', 'technician')->first();
+            if (!$user) {
+                return response()->json([
+                    'status_code' => 2,
+                    'message' => 'Technician not found.',
+                ]);
+            }
+        } else {
+            if ($authUser->role !== 'technician') {
+                return response()->json([
+                    'status_code' => 2,
+                    'message' => 'Only technicians can access their own journey.',
+                ]);
+            }
+            $user = $authUser;
+        }
+
+        // Get the last 3 days including today
+        $dates = [
+            Carbon::today()->subDays(2)->toDateString(),
+            Carbon::today()->subDays(1)->toDateString(),
+            Carbon::today()->toDateString(),
+        ];
+
+        // Fetch and group technician_areas data
+        $locations = DB::table('technician_areas')
+            ->where('user_id', $user->id)
+            ->whereIn(DB::raw('DATE(created_at)'), $dates)
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->groupBy(function ($item) {
+                return Carbon::parse($item->created_at)->toDateString();
+            });
+
+        // Structure journey output using actual dates
+        $journey = [];
+        foreach ($dates as $date) {
+            $journey[$date] = $locations->get($date) ?? [];
+        }
+
+        return response()->json([
+            'status_code' => 1,
+            'data' => [
+                'technician_id' => $user->id,
+                'name' => $user->name,
+                'journey' => $journey
+            ],
+            'message' => 'Technician journey fetched successfully.'
         ]);
     }
 }

@@ -77,6 +77,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/bookings/{booking_id}/assignment/status', [UserBookingController::class, 'updateAssignmentStatus']);
             Route::post('/technician/update-profile', [TechnicianProfileController::class, 'updateProfile']);
             Route::get('/technician/profile/fetch', [TechnicianProfileController::class, 'getProfile']);
+            Route::get('/technician/journey', [TechnicianProfileController::class, 'getJourney']);
+
 
 
 
