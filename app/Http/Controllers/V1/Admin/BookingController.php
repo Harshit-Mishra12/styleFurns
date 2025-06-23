@@ -32,9 +32,9 @@ class BookingController extends Controller
             'customer_email'     => 'nullable|email',
             'customer_phone'     => 'required|string',
             'customer_address'   => 'required|string',
-            'customer_area'      => 'required|string',
-            'customer_latitude'  => 'nullable|numeric|between:-90,90',
-            'customer_longitude' => 'nullable|numeric|between:-180,180',
+            'customer_area'      => 'nullable|string',
+            'customer_latitude'  => 'required|numeric|between:-90,90',
+            'customer_longitude' => 'required|numeric|between:-180,180',
             'remark'             => 'nullable|string|max:1000',
             'status_comment'     => 'nullable|string|max:1000',
             'required_skills'    => 'nullable|array',
@@ -57,7 +57,7 @@ class BookingController extends Controller
             'parts.*.is_required'         => 'nullable|boolean',
             'parts.*.notes'               => 'nullable|string|max:1000',
 
-            'before_images'               => 'required|array',
+            'before_images'               => 'nullable|array',
             'before_images.*'             => 'image|mimes:jpeg,png,jpg,gif|max:2048'
         ]);
 
