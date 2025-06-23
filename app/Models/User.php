@@ -94,6 +94,12 @@ class User extends Authenticatable
         return $this->hasOne(TechnicianArea::class, 'user_id')->latestOfMany();
     }
 
+    public function latestArea()
+    {
+        return $this->hasOne(TechnicianArea::class)->latestOfMany();
+    }
+
+
 
 
     // In User.php model
