@@ -15,6 +15,8 @@ use App\Services\BookingPartsService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use App\Services\TechnicianAssignmentService;
+use Illuminate\Support\Facades\Log;
+
 
 
 
@@ -539,7 +541,7 @@ class BookingController extends Controller
             ->where('job_status', 'online')
             ->get();
 
-
+        // dd($technicians);
         $results = [];
 
         foreach ($technicians as $technician) {
@@ -588,6 +590,7 @@ class BookingController extends Controller
             $lastLng = null;
 
             if ($assignmentsToday->isNotEmpty()) {
+
                 $lastBooking = Booking::where('current_technician_id', $technician->id)
                     ->whereDate('scheduled_date', now()->toDateString())
                     ->where('status', 'pending')
@@ -599,16 +602,33 @@ class BookingController extends Controller
                     $sourceLat = $lastBooking->customer->latitude;
                     $sourceLng = $lastBooking->customer->longitude;
                 }
-            } elseif ($technician->latestArea) {
-                $sourceLat = $technician->latestArea->latitude;
-                $sourceLng = $technician->latestArea->longitude;
+            } elseif (
+                $technician->latestTechnicianArea &&
+                \Carbon\Carbon::parse($technician->latestTechnicianArea->created_at)->isToday()
+            ) {
+
+                $sourceLat = $technician->latestTechnicianArea->latitude;
+                $sourceLng = $technician->latestTechnicianArea->longitude;
             } else {
-                $sourceLat = $technician->latitude;  // base
-                $sourceLng = $technician->longitude; // base
-            }
+                $sourceLat = 45.493208;  // admin base location
+                $sourceLng = -73.853039; // admin base location
+            };
+
+            // dd([
+            //     'techncian_id' => $technician->id,
+            //     'lat2' => $sourceLat,
+            //     'lon2' => $sourceLng,
+            // ]);
 
             // ✅ Step 5: Calculate distance
             $distanceKm = $this->calculateDistance($customerLat, $customerLng, $sourceLat, $sourceLng); // Haversine
+            // $distanceKm = $this->calculateDistance(
+            //     (float) $customerLat,
+            //     (float) $customerLng,
+            //     (float) $sourceLat,
+            //     (float) $sourceLng
+            // );
+
             $totalSkillsRequired = count($requiredSkillIds);
 
             // ✅ Step 6: Scoring
@@ -645,6 +665,35 @@ class BookingController extends Controller
         ]);
     }
 
+    // private function calculateDistance(float $lat1, float $lon1, float $lat2, float $lon2): float
+    // {
+    //     // dd([
+    //     //     'lat1' => $lat1,
+    //     //     'lon1' => $lon1,
+    //     //     'lat2' => $lat2,
+    //     //     'lon2' => $lon2,
+    //     // ]);
+
+    //     $earthRadius = 6371; // km
+
+    //     // Log::debug('Calculating distance with coordinates:', [
+    //     //     'lat1' => $lat1,
+    //     //     'lon1' => $lon1,
+    //     //     'lat2' => $lat2,
+    //     //     'lon2' => $lon2,
+    //     // ]);
+
+    //     $dLat = deg2rad($lat2 - $lat1);
+    //     $dLon = deg2rad($lon2 - $lon1);
+
+    //     $a = sin($dLat / 2) * sin($dLat / 2) +
+    //         cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+    //         sin($dLon / 2) * sin($dLon / 2);
+
+    //     $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+    //     return $earthRadius * $c;
+    // }
 
     private function calculateDistance($lat1, $lon1, $lat2, $lon2)
     {

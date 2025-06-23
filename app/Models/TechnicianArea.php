@@ -16,6 +16,12 @@ class TechnicianArea extends Model
         'longitude'
     ];
 
+    protected $casts = [
+        'latitude' => 'float',
+        'longitude' => 'float',
+    ];
+
+
     public function technician()
     {
         return $this->belongsTo(User::class, 'user_id');
