@@ -631,7 +631,7 @@ class BookingController extends Controller
                 'distance_km'       => round($distanceKm, 2),
                 'distance_score'    => round($distanceScore),
                 'total_score'       => round($totalScore),
-                'technicians' => $technician
+                'technician' => $technician
             ];
         }
 
