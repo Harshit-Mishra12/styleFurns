@@ -60,7 +60,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/bookings/fetch', [AdminBookingController::class, 'index']);
             Route::get('/bookings/fetch/{id}', [AdminBookingController::class, 'show']);
             Route::post('/bookings/{booking_id}/update', [AdminBookingController::class, 'updateBooking']);
-            Route::get('/available_slots/fetch', [AdminBookingController::class, 'getAvailableSlots']);
+            Route::post('/available_slots/fetch', [AdminBookingController::class, 'getAvailableSlots']);
             Route::get('/bookings/stats', [AdminBookingController::class, 'getStats']);
 
             Route::get('/customers/fetch', [CustomerController::class, 'index']);
@@ -78,11 +78,6 @@ Route::prefix('v1')->group(function () {
             Route::post('/technician/update-profile', [TechnicianProfileController::class, 'updateProfile']);
             Route::get('/technician/profile/fetch', [TechnicianProfileController::class, 'getProfile']);
             Route::get('/technician/journey', [TechnicianProfileController::class, 'getJourney']);
-
-
-
-
-
             Route::post('/bookings/{booking_id}/images/upload', [UserBookingController::class, 'uploadBookingImages']);
         });
 
