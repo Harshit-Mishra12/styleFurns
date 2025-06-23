@@ -18,7 +18,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('booking_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade'); // technician
-            $table->string('status'); // 'assigned', 'rejected', 'rescheduled', 'left', 'busy', 'accepted'
+            $table->string('status'); // 'assigned', 'arrived_location','leaving_location','in_progress'
             $table->text('reason')->nullable();
             $table->text('comment')->nullable();
             $table->timestamp('assigned_at')->nullable();

@@ -82,6 +82,20 @@ class User extends Authenticatable
         return $this->hasMany(Notification::class);
     }
 
+    // In App\Models\User.php
+
+    public function technicianSkills()
+    {
+        return $this->hasMany(TechnicianSkill::class, 'user_id');
+    }
+
+    public function latestTechnicianArea()
+    {
+        return $this->hasOne(TechnicianArea::class, 'user_id')->latestOfMany();
+    }
+
+
+
     // In User.php model
 
 }

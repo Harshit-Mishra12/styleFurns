@@ -9,6 +9,7 @@ use App\Models\BookingAssignment;
 use App\Models\BookingImage;
 use App\Models\BookingPart;
 use App\Models\Customer;
+use App\Models\Skill;
 use App\Models\User;
 use App\Services\BookingPartsService;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,7 @@ class BookingController extends Controller
             'damage_desc'        => 'nullable|string',
             'scheduled_date'     => 'required|date',
             'customer_name'      => 'required|string',
+            'slots_required'      => 'required|numeric',
             'customer_email'     => 'nullable|email',
             'customer_phone'     => 'required|string',
             'customer_address'   => 'required|string',
@@ -78,10 +80,12 @@ class BookingController extends Controller
             $booking = Booking::create([
                 'name'              => $request->name,
                 'damage_desc'       => $request->damage_desc,
-                'scheduled_date'    => $request->scheduled_date,
+                // 'scheduled_date'    => $request->scheduled_date,
+                'scheduled_date' => now()->toDateString(),
                 'status'            => $status,
+                'reason' => null,
                 'current_technician_id' => $request->selected_slot['technician_id'] ?? null,
-                'slots_required'    => 1,
+                'slots_required'    => $request->slots_required,
                 'price'             => 0.00,
                 'customer_id'       => $customer->id,
                 'is_active'         => false,
@@ -511,48 +515,200 @@ class BookingController extends Controller
     }
 
 
-
     public function getAvailableSlots(Request $request)
     {
+        // ✅ Step 1: Validate request inputs
+        $request->validate([
+            'skills_required'    => 'required|array',
+            'skills_required.*'  => 'integer|exists:skills,id',
+            'customer_latitude'  => 'required|numeric',
+            'customer_longitude' => 'required|numeric',
+            'required_slots'     => 'required|integer|min:1',
+        ]);
 
-        // In production: Validate location inputs
-        $latitude = $request->get('latitude');   // e.g. 19.0760
-        $longitude = $request->get('longitude'); // e.g. 72.8777
+        $requiredSkillIds = $request->skills_required;
+        $customerLat = $request->customer_latitude;
+        $customerLng = $request->customer_longitude;
+        $requiredSlots = (int) $request->required_slots;
+        $maxDailySlots = 14;
+        $today = now()->toDateString();
 
-        // 1. Fetch nearby technicians with role = technician (you can filter by skill/availability/etc.)
-        // This is dummy for now. Replace with actual location-based filtering later.
-        $technicians = User::where('role', 'technician')->take(3)->get();
-
-        // 2. Dummy booked slot data for now
-        $today = date('Y-m-d');
-
-        $dummyBookedSlots = [
-            ['date' => $today, 'time' => '10:00 AM'],
-            ['date' => $today, 'time' => '11:00 AM'],
-            ['date' => $today, 'time' => '12:00 PM'],
-        ];
+        // ✅ Step 2: Fetch online technicians with their skills and last known location
+        $technicians = User::with(['technicianSkills', 'latestTechnicianArea'])
+            ->where('role', 'technician')
+            ->where('job_status', 'online')
+            ->get();
 
 
-        // 3. Create dummy slot response
         $results = [];
 
-        foreach ($technicians as $index => $technician) {
+        foreach ($technicians as $technician) {
+            $technicianSkillIds = $technician->technicianSkills->pluck('skill_id')->toArray();
+            $skillMatched = array_intersect($requiredSkillIds, $technicianSkillIds);
+
+            if (empty($skillMatched)) {
+                continue; // skip if no matching skill
+            }
+
+            // ✅ Step 3: Count booked slots for the day
+            // $assignmentsToday = BookingAssignment::where('user_id', $technician->id)
+            //     ->whereDate('slot_date', $today)
+            //     ->whereHas('booking', fn($q) => $q->where('status', 'pending'))
+            //     ->get();
+            $assignmentsToday = BookingAssignment::where('user_id', $technician->id)
+                ->whereDate('slot_date', $today)
+                ->where('status', '!=', 'unassigned') // ✅ filter out unassigned
+                ->whereHas('booking', fn($q) => $q->where('status', 'pending'))
+                ->get();
+
+
+            $bookedSlotCount = $assignmentsToday->sum(fn($a) => $a->booking->slots_required ?? 1);
+            // $bookedSlots = $assignmentsToday->map(function ($assignment) {
+            //     return [
+            //         'date' => $assignment->slot_date,
+            //         'time' => \Carbon\Carbon::parse($assignment->time_start)->format('h:i A'),
+            //     ];
+            // })->values()->all();
+            $bookedSlots = $assignmentsToday->map(function ($assignment) {
+                return [
+                    'date' => \Carbon\Carbon::parse($assignment->slot_date)->format('Y-m-d'),
+                    'time' => \Carbon\Carbon::parse($assignment->time_start)->format('h:i A'),
+                ];
+            })->values()->all();
+
+
+            $freeSlots = max(0, $maxDailySlots - $bookedSlotCount);
+
+            if ($freeSlots < $requiredSlots) {
+                continue;
+            }
+
+            // ✅ Step 4: Determine technician's last known location
+            $lastLat = null;
+            $lastLng = null;
+
+            if ($assignmentsToday->isNotEmpty()) {
+                $lastBooking = Booking::where('current_technician_id', $technician->id)
+                    ->whereDate('scheduled_date', now()->toDateString())
+                    ->where('status', 'pending')
+                    ->orderByDesc('updated_at')
+                    ->with('customer')
+                    ->first();
+
+                if ($lastBooking && $lastBooking->customer) {
+                    $sourceLat = $lastBooking->customer->latitude;
+                    $sourceLng = $lastBooking->customer->longitude;
+                }
+            } elseif ($technician->latestArea) {
+                $sourceLat = $technician->latestArea->latitude;
+                $sourceLng = $technician->latestArea->longitude;
+            } else {
+                $sourceLat = $technician->latitude;  // base
+                $sourceLng = $technician->longitude; // base
+            }
+
+            // ✅ Step 5: Calculate distance
+            $distanceKm = $this->calculateDistance($customerLat, $customerLng, $sourceLat, $sourceLng); // Haversine
+            $totalSkillsRequired = count($requiredSkillIds);
+
+            // ✅ Step 6: Scoring
+            $skillScore = ($totalSkillsRequired > 0) ? (count($skillMatched) / $totalSkillsRequired) * 100 : 0;
+            $slotScore = $bookedSlotCount * -10;
+            $distanceScore = $distanceKm * -10;
+            $totalScore = $skillScore + $slotScore + $distanceScore;
+
             $results[] = [
-                'technician'  => $technician,
-                'totalScore'  => 500 - ($index * 50),
-                'skillScore'  => (2 + $index) / 5,
-                'distance'    => (5 + $index * 3) . ' km',
-                'freeSlots'   => 5 - $index,
-                'bookedSlots' => $dummyBookedSlots,
+                'technician_id'     => $technician->id,
+                'tech_name'         => $technician->name,
+                'status'            => $technician->job_status,
+                'skill_matched'     => Skill::whereIn('id', $skillMatched)->pluck('name')->toArray(),
+                'total_skills_required' => $totalSkillsRequired,
+                'booked_slots_count' => $bookedSlotCount,
+                'booked_slots' => $bookedSlots,
+                'free_slots'        => $freeSlots,
+                'skill_score'       => round($skillScore),
+                'slot_score'        => $slotScore,
+                'distance_km'       => round($distanceKm, 2),
+                'distance_score'    => round($distanceScore),
+                'total_score'       => round($totalScore),
             ];
         }
 
+        // ✅ Step 7: Sort by total score
+        usort($results, fn($a, $b) => $b['total_score'] <=> $a['total_score']);
+
         return response()->json([
             'status_code' => 1,
-            'message' => 'Nearby technician slots fetched successfully.',
-            'data' => $results,
+            'message'     => 'Technician availability fetched successfully.',
+            'data'        => $results,
         ]);
     }
+
+
+    private function calculateDistance($lat1, $lon1, $lat2, $lon2)
+    {
+        $earthRadius = 6371; // km
+
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+
+        $a = sin($dLat / 2) * sin($dLat / 2) +
+            cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+            sin($dLon / 2) * sin($dLon / 2);
+
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+        return $earthRadius * $c;
+    }
+
+
+    // public function getAvailableSlots(Request $request)
+    // {
+
+    //     //step -1 fetch all online techncians
+    //     // step -2- remove all techncian with zero skills matching
+    //     //step 3 create score-->
+    //     // a-drive skills score for each techncian
+    //     // b->
+
+    //     // In production: Validate location inputs
+    //     $latitude = $request->get('latitude');   // e.g. 19.0760
+    //     $longitude = $request->get('longitude'); // e.g. 72.8777
+
+    //     // 1. Fetch nearby technicians with role = technician (you can filter by skill/availability/etc.)
+    //     // This is dummy for now. Replace with actual location-based filtering later.
+    //     $technicians = User::where('role', 'technician')->take(3)->get();
+
+    //     // 2. Dummy booked slot data for now
+    //     $today = date('Y-m-d');
+
+    //     $dummyBookedSlots = [
+    //         ['date' => $today, 'time' => '10:00 AM'],
+    //         ['date' => $today, 'time' => '11:00 AM'],
+    //         ['date' => $today, 'time' => '12:00 PM'],
+    //     ];
+
+
+    //     // 3. Create dummy slot response
+    //     $results = [];
+
+    //     foreach ($technicians as $index => $technician) {
+    //         $results[] = [
+    //             'technician'  => $technician,
+    //             'totalScore'  => 500 - ($index * 50),
+    //             'skillScore'  => (2 + $index) / 5,
+    //             'distance'    => (5 + $index * 3) . ' km',
+    //             'freeSlots'   => 5 - $index, //for that day for that technian
+    //             'bookedSlots' => $dummyBookedSlots,
+    //         ];
+    //     }
+
+    //     return response()->json([
+    //         'status_code' => 1,
+    //         'message' => 'Nearby technician slots fetched successfully.',
+    //         'data' => $results,
+    //     ]);
+    // }
 
     public function getStats(Request $request)
     {
