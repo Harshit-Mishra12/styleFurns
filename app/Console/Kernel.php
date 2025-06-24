@@ -43,7 +43,7 @@ class Kernel extends ConsoleKernel
         // Schedule the command to run periodically
 
         $schedule->command('technicians:set-offline')->dailyAt('22:00');
-        $schedule->command('bookings:auto-reschedule')->everyFiveMinutes();
+        $schedule->command('bookings:auto-reschedule')->everyThreeMinutes();
         // $schedule->command('create:random-team')->everyThreeMinutes();
         // $schedule->command('events:update-status')->everyThreeMinutes(); // Runs every hour
         // $schedule->command('fetch:match-player-points')->everyThreeMinutes();

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\V1\User;
 
 use App\Helpers\Helper;
 use App\Http\Controllers\Controller;
+use App\Models\BookingAssignment;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -89,7 +90,6 @@ class TechnicianProfileController extends Controller
     }
 
 
-
     public function getProfile(Request $request)
     {
         $authUser = Auth::user();
@@ -131,6 +131,24 @@ class TechnicianProfileController extends Controller
 
         $latestLocation = $user->technicianAreas()->latest()->first();
 
+        // 👇 Add booked slots for today
+        $today = \Carbon\Carbon::now()->toDateString();
+
+        $assignmentsToday = BookingAssignment::where('user_id', $user->id)
+            ->whereDate('slot_date', $today)
+            ->where('status', '!=', 'unassigned')
+            ->whereHas('booking', function ($q) {
+                $q->where('status', 'pending');
+            })
+            ->get();
+
+        $bookedSlots = $assignmentsToday->map(function ($assignment) {
+            return [
+                'date' => \Carbon\Carbon::parse($assignment->slot_date)->format('Y-m-d'),
+                'time' => \Carbon\Carbon::parse($assignment->time_start)->format('h:i A'),
+            ];
+        })->values()->all();
+
         return response()->json([
             'status_code' => 1,
             'data' => [
@@ -147,11 +165,75 @@ class TechnicianProfileController extends Controller
                     'longitude' => $latestLocation->longitude,
                     'area' => $latestLocation->area,
                     'updated_at' => $latestLocation->created_at->toDateTimeString(),
-                ] : null
+                ] : null,
+                'booked_slots' => $bookedSlots
             ],
             'message' => 'Technician profile fetched successfully.'
         ]);
     }
+
+    // public function getProfile(Request $request)
+    // {
+    //     $authUser = Auth::user();
+    //     $technicianId = $request->input('technician_id');
+
+    //     if ($technicianId) {
+    //         if ($authUser->role !== 'admin') {
+    //             return response()->json([
+    //                 'status_code' => 2,
+    //                 'message' => 'Unauthorized to access other technician profiles.',
+    //             ]);
+    //         }
+
+    //         $user = User::where('id', $technicianId)->where('role', 'technician')->first();
+
+    //         if (!$user) {
+    //             return response()->json([
+    //                 'status_code' => 2,
+    //                 'message' => 'Technician not found.',
+    //             ]);
+    //         }
+    //     } else {
+    //         $user = $authUser;
+
+    //         if ($user->role !== 'technician') {
+    //             return response()->json([
+    //                 'status_code' => 2,
+    //                 'message' => 'Only technicians can access this profile.',
+    //             ]);
+    //         }
+    //     }
+
+    //     // 👇 Manual skill fetch (no relationship)
+    //     $skills = DB::table('technician_skills')
+    //         ->join('skills', 'technician_skills.skill_id', '=', 'skills.id')
+    //         ->where('technician_skills.user_id', $user->id)
+    //         ->select('technician_skills.id as technician_skill_id', 'skills.id as skill_id', 'skills.name as skill_name')
+    //         ->get();
+
+    //     $latestLocation = $user->technicianAreas()->latest()->first();
+
+    //     return response()->json([
+    //         'status_code' => 1,
+    //         'data' => [
+    //             'id' => $user->id,
+    //             'name' => $user->name,
+    //             'email' => $user->email,
+    //             'mobile' => $user->mobile,
+    //             'profile_picture' => $user->profile_picture,
+    //             'job_status' => $user->job_status,
+    //             'joined_at' => $user->created_at->toDateString(),
+    //             'technician_skills' => $skills,
+    //             'location' => $latestLocation ? [
+    //                 'latitude' => $latestLocation->latitude,
+    //                 'longitude' => $latestLocation->longitude,
+    //                 'area' => $latestLocation->area,
+    //                 'updated_at' => $latestLocation->created_at->toDateTimeString(),
+    //             ] : null
+    //         ],
+    //         'message' => 'Technician profile fetched successfully.'
+    //     ]);
+    // }
 
     public function updateProfile(Request $request)
     {
