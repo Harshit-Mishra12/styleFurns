@@ -144,4 +144,33 @@ class BookingController extends Controller
             'data' => []
         ]);
     }
+
+    public function updateJobStatus(Request $request, $id)
+    {
+        $request->validate([
+            'current_job_status' => 'required|string', //in:enroute,on-site,working,completed
+            'started_at'         => 'nullable|date',
+            'ended_at'           => 'nullable|date|after_or_equal:started_at',
+        ]);
+
+        $assignment = BookingAssignment::findOrFail($id);
+
+        $assignment->current_job_status = $request->current_job_status;
+
+        if ($request->filled('started_at')) {
+            $assignment->started_at = $request->started_at;
+        }
+
+        if ($request->filled('ended_at')) {
+            $assignment->ended_at = $request->ended_at;
+        }
+
+        $assignment->save();
+
+        return response()->json([
+            'status_code' => 1,
+            'message'     => 'Job status updated successfully.',
+            'data'        => $assignment,
+        ]);
+    }
 }
