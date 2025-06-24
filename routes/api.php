@@ -81,6 +81,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/technician/profile/fetch', [TechnicianProfileController::class, 'getProfile']);
             Route::get('/technician/journey', [TechnicianProfileController::class, 'getJourney']);
             Route::post('/bookings/{booking_id}/images/upload', [UserBookingController::class, 'uploadBookingImages']);
+            Route::post('/bookings/{booking_id}/images/delete', [UserBookingController::class, 'deleteBookingImage']);
+
 
             Route::post('/technician/booking_assignments/{id}/update_status', [UserBookingController::class, 'updateJobStatus']);
         });

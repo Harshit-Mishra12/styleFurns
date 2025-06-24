@@ -111,7 +111,6 @@ class BookingController extends Controller
 
     public function uploadBookingImages(Request $request, $booking_id)
     {
-
         $request->validate([
             'type' => 'required|in:before,after',
             'images' => 'required|array|min:1',
@@ -127,23 +126,72 @@ class BookingController extends Controller
             ]);
         }
 
+        $uploadedImageIds = [];
+
         foreach ($request->file('images') as $imageFile) {
             $imageUrl = Helper::saveImageToServer($imageFile, 'uploads/bookings/');
 
-            BookingImage::create([
+            $bookingImage = BookingImage::create([
                 'booking_id' => $booking->id,
                 'image_url' => $imageUrl,
                 'type' => $request->type,
                 'uploaded_by' => auth()->id(),
             ]);
+
+            $uploadedImageIds[] = $bookingImage->id;
         }
 
         return response()->json([
             'status_code' => 1,
             'message' => 'Images uploaded successfully.',
-            'data' => []
+            'data' => [
+                'uploaded_image_ids' => $uploadedImageIds
+            ]
         ]);
     }
+
+    public function deleteBookingImage(Request $request, $booking_id)
+    {
+        $request->validate([
+            'imageId' => 'required|integer',
+            'type' => 'required|in:before,after',
+        ]);
+
+        $booking = Booking::find($booking_id);
+
+        if (!$booking) {
+            return response()->json([
+                'status_code' => 0,
+                'message' => 'Booking not found.',
+            ]);
+        }
+
+        $bookingImage = BookingImage::where('id', $request->imageId)
+            ->where('booking_id', $booking_id)
+            ->where('type', $request->type)
+            ->first();
+
+        if (!$bookingImage) {
+            return response()->json([
+                'status_code' => 0,
+                'message' => 'Booking image not found.',
+            ]);
+        }
+
+        // Optional: Delete the physical file from server
+        if (file_exists(public_path($bookingImage->image_url))) {
+            unlink(public_path($bookingImage->image_url));
+        }
+
+        $bookingImage->delete();
+
+        return response()->json([
+            'status_code' => 1,
+            'message' => 'Booking image deleted successfully.',
+        ]);
+    }
+
+
 
     public function updateJobStatus(Request $request, $id)
     {
