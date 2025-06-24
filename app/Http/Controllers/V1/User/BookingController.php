@@ -161,7 +161,7 @@ class BookingController extends Controller
 
         if (!$booking) {
             return response()->json([
-                'status_code' => 0,
+                'status_code' => 2,
                 'message' => 'Booking not found.',
             ]);
         }
@@ -173,7 +173,7 @@ class BookingController extends Controller
 
         if (!$bookingImage) {
             return response()->json([
-                'status_code' => 0,
+                'status_code' => 2,
                 'message' => 'Booking image not found.',
             ]);
         }
