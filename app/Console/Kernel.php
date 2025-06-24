@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Console\Commands\AutoRescheduleMissedBookings;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 use App\Console\Commands\UpdateEventStatus;
@@ -11,9 +12,7 @@ use App\Console\Commands\UpdateTeamPoints;
 use App\Console\Commands\CreateRandomTeam;
 use App\Console\Commands\UpdateTeamPointsTest;
 use App\Console\Commands\SetTeamRanksAndCreditWinnings;
-
-
-
+use App\Console\Commands\SetTechniciansOffline;
 
 class Kernel extends ConsoleKernel
 {
@@ -30,7 +29,9 @@ class Kernel extends ConsoleKernel
         UpdateTeamPoints::class,
         CreateRandomTeam::class,
         UpdateTeamPointsTest::class,
-        SetTeamRanksAndCreditWinnings::class
+        SetTeamRanksAndCreditWinnings::class,
+        SetTechniciansOffline::class,
+        AutoRescheduleMissedBookings::class
 
     ];
 
@@ -40,6 +41,9 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule)
     {
         // Schedule the command to run periodically
+
+        $schedule->command('technicians:set-offline')->dailyAt('22:00');
+        $schedule->command('bookings:auto-reschedule')->everyFiveMinutes();
         // $schedule->command('create:random-team')->everyThreeMinutes();
         // $schedule->command('events:update-status')->everyThreeMinutes(); // Runs every hour
         // $schedule->command('fetch:match-player-points')->everyThreeMinutes();
