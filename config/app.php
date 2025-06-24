@@ -70,6 +70,8 @@ return [
     */
 
     'timezone' => 'UTC',
+    // 'timezone' => ' America/Toronto',
+
 
     /*
     |--------------------------------------------------------------------------
@@ -225,4 +227,3 @@ return [
 
     'sendinblue_key' => env('SENDINBLUE_KEY'),
 ];
-
