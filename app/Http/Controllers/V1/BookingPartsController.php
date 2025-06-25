@@ -20,9 +20,10 @@ class BookingPartsController extends Controller
 {
 
 
-
     public function addMissingParts(Request $request, $booking_id, BookingPartsService $partsService)
     {
+
+
         $request->validate([
             'parts' => 'required|array|min:1',
             'parts.*.name' => 'required|string',
@@ -42,14 +43,82 @@ class BookingPartsController extends Controller
             ]);
         }
 
-        $partsService->addMissingParts($request->parts, $booking, auth()->id());
+        $insertedIds = $partsService->addMissingParts($request->parts, $booking, auth()->id());
 
         return response()->json([
             'status_code' => 1,
             'message' => 'Missing parts recorded successfully.',
-            'data' => [],
+            'data' => [
+                'part_ids' => $insertedIds
+            ],
         ]);
     }
+    public function deleteBookingPart(Request $request, $booking_id)
+    {
+        $request->validate([
+            'partId' => 'required|integer|exists:booking_parts,id',
+        ]);
+
+        $booking = Booking::find($booking_id);
+        if (!$booking) {
+            return response()->json([
+                'status_code' => 2,
+                'message' => 'Booking not found.',
+            ]);
+        }
+
+        $part = BookingPart::where('id', $request->partId)
+            ->where('booking_id', $booking_id)
+            ->first();
+
+        if (!$part) {
+            return response()->json([
+                'status_code' => 2,
+                'message' => 'Part not found or does not belong to this booking.',
+            ]);
+        }
+
+        $part->delete();
+
+        return response()->json([
+            'status_code' => 1,
+            'message' => 'Part deleted successfully.',
+            'data' => [
+                'deleted_part_id' => $request->partId
+            ]
+        ]);
+    }
+
+
+    // public function addMissingParts(Request $request, $booking_id, BookingPartsService $partsService)
+    // {
+    //     $request->validate([
+    //         'parts' => 'required|array|min:1',
+    //         'parts.*.name' => 'required|string',
+    //         'parts.*.serial_number' => 'nullable|string',
+    //         'parts.*.quantity' => 'nullable|numeric|min:0.01',
+    //         'parts.*.unit_type' => 'nullable|in:unit,gram,kg,ml,liter,meter',
+    //         'parts.*.provided_by' => 'nullable|in:admin,technician,customer,unknown',
+    //         'parts.*.notes' => 'nullable|string|max:500',
+    //     ]);
+
+    //     $booking = Booking::find($booking_id);
+    //     if (!$booking) {
+    //         return response()->json([
+    //             'status_code' => 2,
+    //             'data' => [],
+    //             'message' => 'Booking not found.',
+    //         ]);
+    //     }
+
+    //     $partsService->addMissingParts($request->parts, $booking, auth()->id());
+
+    //     return response()->json([
+    //         'status_code' => 1,
+    //         'message' => 'Missing parts recorded successfully.',
+    //         'data' => [],
+    //     ]);
+    // }
     public function update(Request $request, $booking_id, $part_id)
     {
         $request->validate([

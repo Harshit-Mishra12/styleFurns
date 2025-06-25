@@ -43,6 +43,8 @@ Route::prefix('v1')->group(function () {
     Route::get('/fetchTermsAndConditions', [TermsAndConditionController::class, 'fetchTermsAndConditions']);
     Route::middleware('auth:sanctum')->post('/bookings/{booking_id}/assign-technician', [AdminBookingController::class, 'assignNearestTechnician']);
     Route::middleware('auth:sanctum')->post('/bookings/{booking_id}/parts/add', [BookingPartsController::class, 'addMissingParts']);
+    Route::middleware('auth:sanctum')->post('/bookings/{booking_id}/parts/delete', [BookingPartsController::class, 'deleteBookingPart']);
+
 
     Route::middleware('auth:sanctum')->put('/bookings/{booking_id}/parts/{part_id}/update', [BookingPartsController::class, 'update']);
     Route::middleware('auth:sanctum')->get('/bookings/{booking_id}/parts', [BookingPartsController::class, 'index']);
