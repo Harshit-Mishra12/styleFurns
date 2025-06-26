@@ -49,7 +49,7 @@ class AutoRescheduleMissedBookings extends Command
                 ]);
 
                 $booking->update([
-                    'status' => 'rescheduling',
+                    'status' => 'rescheduling_required',
                     'reason' => 'arrived_late',
                     'current_technician_id' => null,
                 ]);
