@@ -802,15 +802,26 @@ class BookingController extends Controller
         ]);
     }
 
-    public function updateBookingStatus(Request $request, Booking $booking)
+    public function updateBookingStatus(Request $request)
     {
         $request->validate([
-            'status' => 'required|in:completed,rescheduling_required',
-            'status_comment' => 'nullable|string|max:500',
+            'booking_id'      => 'required|integer|exists:bookings,id',
+            'status'          => 'required|in:completed,rescheduling_required',
+            'status_comment'  => 'nullable|string|max:255',
         ]);
 
+        $booking = Booking::find($request->booking_id);
+
+        if (!$booking) {
+            return response()->json([
+                'status_code' => 0,
+                'message' => 'Booking not found.',
+                'data' => []
+            ]);
+        }
+
         $status = $request->status;
-        $statusComment = $request->status_comment;
+        $comment = $request->status_comment;
 
         if ($status === 'rescheduling_required') {
             $assignment = BookingAssignment::where('booking_id', $booking->id)
@@ -821,30 +832,26 @@ class BookingController extends Controller
             if ($assignment) {
                 $assignment->update([
                     'status' => 'unassigned',
-                    'reason' => 'rescheduling',
+                    'reason' => $comment ?? 'rescheduling_required',
                 ]);
             }
 
             $booking->update([
                 'status' => 'rescheduling_required',
-                'status_comment' => $statusComment ?? null,
+                'status_comment' => $comment,
                 'current_technician_id' => null,
             ]);
         } elseif ($status === 'completed') {
             $booking->update([
                 'status' => 'completed',
-                'status_comment' => $statusComment ?? null,
+                'status_comment' => $comment,
             ]);
         }
 
         return response()->json([
             'status_code' => 1,
-            'message' => "Booking status updated to '{$status}'.",
-            'data' => [
-                'booking_id' => $booking->id,
-                'new_status' => $status,
-                'status_comment' => $statusComment,
-            ]
+            'message' => 'Booking status updated successfully.',
+            'data' => []
         ]);
     }
 }
