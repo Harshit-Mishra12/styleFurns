@@ -801,4 +801,50 @@ class BookingController extends Controller
             ]
         ]);
     }
+
+    public function updateBookingStatus(Request $request, Booking $booking)
+    {
+        $request->validate([
+            'status' => 'required|in:completed,rescheduling_required',
+            'status_comment' => 'nullable|string|max:500',
+        ]);
+
+        $status = $request->status;
+        $statusComment = $request->status_comment;
+
+        if ($status === 'rescheduling_required') {
+            $assignment = BookingAssignment::where('booking_id', $booking->id)
+                ->where('status', 'assigned')
+                ->latest()
+                ->first();
+
+            if ($assignment) {
+                $assignment->update([
+                    'status' => 'unassigned',
+                    'reason' => 'rescheduling',
+                ]);
+            }
+
+            $booking->update([
+                'status' => 'rescheduling_required',
+                'status_comment' => $statusComment ?? null,
+                'current_technician_id' => null,
+            ]);
+        } elseif ($status === 'completed') {
+            $booking->update([
+                'status' => 'completed',
+                'status_comment' => $statusComment ?? null,
+            ]);
+        }
+
+        return response()->json([
+            'status_code' => 1,
+            'message' => "Booking status updated to '{$status}'.",
+            'data' => [
+                'booking_id' => $booking->id,
+                'new_status' => $status,
+                'status_comment' => $statusComment,
+            ]
+        ]);
+    }
 }
