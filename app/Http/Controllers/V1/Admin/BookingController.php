@@ -875,7 +875,7 @@ class BookingController extends Controller
 
         if (!$booking) {
             return response()->json([
-                'status_code' => 0,
+                'status_code' => 2,
                 'message' => 'Booking not found.',
                 'data' => []
             ]);
@@ -883,7 +883,7 @@ class BookingController extends Controller
 
         if ($booking->status !== 'rescheduling_required') {
             return response()->json([
-                'status_code' => 0,
+                'status_code' => 2,
                 'message' => 'Booking is not marked for rescheduling.',
                 'data' => []
             ]);
