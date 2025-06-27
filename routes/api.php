@@ -66,7 +66,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/bookings/{booking_id}/update', [AdminBookingController::class, 'updateBooking']);
             Route::post('/available_slots/fetch', [AdminBookingController::class, 'getAvailableSlots']);
             Route::get('/bookings/stats', [AdminBookingController::class, 'getStats']);
-
+            Route::post('/bookings/{booking_id}/status/update', [AdminBookingController::class, 'assignTechnicianToRescheduledBooking']);
             Route::get('/customers/fetch', [CustomerController::class, 'index']);
 
 

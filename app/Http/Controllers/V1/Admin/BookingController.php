@@ -857,4 +857,62 @@ class BookingController extends Controller
             'data' => []
         ]);
     }
+
+    public function assignTechnicianToRescheduledBooking(Request $request, $booking_id)
+    {
+
+
+        $request->validate([
+            'selected_slot.technician_id' => 'required|integer|exists:users,id',
+            'selected_slot.date'          => 'required|date',
+            'selected_slot.time_start'    => 'required|date_format:H:i',
+            'selected_slot.time_end'      => 'required|date_format:H:i|after:selected_slot.time_start',
+        ]);
+
+
+
+        $booking = Booking::find($booking_id);
+
+        if (!$booking) {
+            return response()->json([
+                'status_code' => 0,
+                'message' => 'Booking not found.',
+                'data' => []
+            ]);
+        }
+
+        if ($booking->status !== 'rescheduling_required') {
+            return response()->json([
+                'status_code' => 0,
+                'message' => 'Booking is not marked for rescheduling.',
+                'data' => []
+            ]);
+        }
+
+        $slot = $request->selected_slot;
+
+        // Step 1: Assign new technician
+        BookingAssignment::create([
+            'booking_id'   => $booking->id,
+            'user_id'      => $slot['technician_id'],
+            'status'       => 'assigned',
+            'assigned_at'  => now(),
+            'slot_date'    => $slot['date'],
+            'time_start'   => $slot['time_start'],
+            'time_end'     => $slot['time_end'],
+        ]);
+
+        // Step 2: Update booking
+        $booking->update([
+            'status'                 => 'pending',
+            'current_technician_id'  => $slot['technician_id'],
+            'status_comment'         => null, // Optional: clear previous comment
+        ]);
+
+        return response()->json([
+            'status_code' => 1,
+            'message'     => 'Technician assigned and booking status updated to pending.',
+            'data'        => []
+        ]);
+    }
 }
