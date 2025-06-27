@@ -50,7 +50,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->get('/bookings/{booking_id}/parts', [BookingPartsController::class, 'index']);
     Route::middleware('auth:sanctum')->get('/technicians/fetch', [TechnicianController::class, 'index']);
 
-    Route::middleware('auth:sanctum')->post('/bookings/{booking_id}/status/update', [AdminBookingController::class, 'updateBookingStatus']);
+    Route::middleware('auth:sanctum')->post('/bookings/status/update', [AdminBookingController::class, 'updateBookingStatus']);
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/notifications', [NotificationController::class, 'index']);
