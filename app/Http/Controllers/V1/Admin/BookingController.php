@@ -801,12 +801,11 @@ class BookingController extends Controller
             ]
         ]);
     }
-
     public function updateBookingStatus(Request $request)
     {
         $request->validate([
             'booking_id'      => 'required|integer|exists:bookings,id',
-            'status'          => 'required|in:completed,rescheduling_required',
+            'status'          => 'required|in:completed,rescheduling_required,waiting_parts',
             'status_comment'  => 'nullable|string|max:255',
             'price'           => 'required_if:status,completed|nullable|numeric|min:0',
         ]);
@@ -815,7 +814,7 @@ class BookingController extends Controller
 
         if (!$booking) {
             return response()->json([
-                'status_code' => 0,
+                'status_code' => 2,
                 'message' => 'Booking not found.',
                 'data' => []
             ]);
@@ -825,7 +824,7 @@ class BookingController extends Controller
         $comment = $request->status_comment;
         $price = $request->price;
 
-        if ($status === 'rescheduling_required') {
+        if ($status === 'rescheduling_required' || $status === 'waiting_parts') {
             $assignment = BookingAssignment::where('booking_id', $booking->id)
                 ->where('status', 'assigned')
                 ->latest()
@@ -834,12 +833,12 @@ class BookingController extends Controller
             if ($assignment) {
                 $assignment->update([
                     'status' => 'unassigned',
-                    'reason' => $comment ?? 'rescheduling_required',
+                    'reason' => $comment ?? $status,
                 ]);
             }
 
             $booking->update([
-                'status' => 'rescheduling_required',
+                'status' => $status,
                 'status_comment' => $comment,
                 'current_technician_id' => null,
             ]);
@@ -857,6 +856,62 @@ class BookingController extends Controller
             'data' => []
         ]);
     }
+
+    // public function updateBookingStatus(Request $request)
+    // {
+    //     $request->validate([
+    //         'booking_id'      => 'required|integer|exists:bookings,id',
+    //         'status'          => 'required|in:completed,rescheduling_required',
+    //         'status_comment'  => 'nullable|string|max:255',
+    //         'price'           => 'required_if:status,completed|nullable|numeric|min:0',
+    //     ]);
+
+    //     $booking = Booking::find($request->booking_id);
+
+    //     if (!$booking) {
+    //         return response()->json([
+    //             'status_code' => 0,
+    //             'message' => 'Booking not found.',
+    //             'data' => []
+    //         ]);
+    //     }
+
+    //     $status = $request->status;
+    //     $comment = $request->status_comment;
+    //     $price = $request->price;
+
+    //     if ($status === 'rescheduling_required') {
+    //         $assignment = BookingAssignment::where('booking_id', $booking->id)
+    //             ->where('status', 'assigned')
+    //             ->latest()
+    //             ->first();
+
+    //         if ($assignment) {
+    //             $assignment->update([
+    //                 'status' => 'unassigned',
+    //                 'reason' => $comment ?? 'rescheduling_required',
+    //             ]);
+    //         }
+
+    //         $booking->update([
+    //             'status' => 'rescheduling_required',
+    //             'status_comment' => $comment,
+    //             'current_technician_id' => null,
+    //         ]);
+    //     } elseif ($status === 'completed') {
+    //         $booking->update([
+    //             'status' => 'completed',
+    //             'status_comment' => $comment,
+    //             'price' => $price,
+    //         ]);
+    //     }
+
+    //     return response()->json([
+    //         'status_code' => 1,
+    //         'message' => 'Booking status updated successfully.',
+    //         'data' => []
+    //     ]);
+    // }
 
     public function assignTechnicianToRescheduledBooking(Request $request, $booking_id)
     {
