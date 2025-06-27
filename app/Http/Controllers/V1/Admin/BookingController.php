@@ -808,6 +808,7 @@ class BookingController extends Controller
             'booking_id'      => 'required|integer|exists:bookings,id',
             'status'          => 'required|in:completed,rescheduling_required',
             'status_comment'  => 'nullable|string|max:255',
+            'price'           => 'required_if:status,completed|nullable|numeric|min:0',
         ]);
 
         $booking = Booking::find($request->booking_id);
@@ -822,6 +823,7 @@ class BookingController extends Controller
 
         $status = $request->status;
         $comment = $request->status_comment;
+        $price = $request->price;
 
         if ($status === 'rescheduling_required') {
             $assignment = BookingAssignment::where('booking_id', $booking->id)
@@ -845,6 +847,7 @@ class BookingController extends Controller
             $booking->update([
                 'status' => 'completed',
                 'status_comment' => $comment,
+                'price' => $price,
             ]);
         }
 
