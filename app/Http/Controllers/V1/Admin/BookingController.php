@@ -601,18 +601,22 @@ class BookingController extends Controller
                 if ($lastBooking && $lastBooking->customer) {
                     $sourceLat = $lastBooking->customer->latitude;
                     $sourceLng = $lastBooking->customer->longitude;
+                } else {
+                    // If lastBooking is null or doesn't have a customer
+                    $sourceLat = 45.493208;
+                    $sourceLng = -73.853039;
                 }
             } elseif (
                 $technician->latestTechnicianArea &&
                 \Carbon\Carbon::parse($technician->latestTechnicianArea->created_at)->isToday()
             ) {
-
                 $sourceLat = $technician->latestTechnicianArea->latitude;
                 $sourceLng = $technician->latestTechnicianArea->longitude;
             } else {
-                $sourceLat = 45.493208;  // admin base location
-                $sourceLng = -73.853039; // admin base location
-            };
+                $sourceLat = 45.493208; // Admin base location
+                $sourceLng = -73.853039;
+            }
+
 
             // dd([
             //     'techncian_id' => $technician->id,
