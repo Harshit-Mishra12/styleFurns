@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('mobile')->unique();
             $table->string('password');
             $table->string('profile_picture')->nullable();
-            $table->string('status')->default('active');
+            $table->string('status')->default('active'); //active,inactive
             // Flexible Role
             $table->string('role')->default('user'); // e.g., admin, user, technician
             $table->string('job_status')->default('offline'); // e.g., online, offline, engaged

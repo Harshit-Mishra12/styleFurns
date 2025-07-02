@@ -70,6 +70,10 @@ Route::prefix('v1')->group(function () {
             Route::get('/customers/fetch', [CustomerController::class, 'index']);
 
 
+            Route::post('/technicians/work_status/update', [AdminBookingController::class, 'updateTechnicianWorkStatus']);
+
+
+
 
 
 
