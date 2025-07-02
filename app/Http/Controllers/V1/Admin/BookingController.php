@@ -815,7 +815,7 @@ class BookingController extends Controller
         }
 
         // Technician counts
-        $totalTechnicians = User::where('role', 'technician')->where('status', 'active')->count(); // Excludes inactive
+        $totalTechnicians = User::where('role', 'technician')->count(); // Excludes inactive
         $activeTechnicians = User::where('role', 'technician')->where('status', 'active')->count();
         $inactiveTechnicians = User::where('role', 'technician')->where('status', 'inactive')->count();
 
@@ -1063,6 +1063,8 @@ class BookingController extends Controller
                     ]);
                 }
             }
+
+            $technician->job_status = "offline";
         }
 
         // Save the technician's active/inactive status in a dedicated column if available
