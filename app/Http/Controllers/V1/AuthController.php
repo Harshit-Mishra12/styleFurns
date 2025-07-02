@@ -155,7 +155,7 @@ class AuthController extends Controller
                 'profile_picture' => $profilePicturePath,
                 'role'            => $request->role ?? 'user',
                 'otp'             => $otp,
-                'status'          => 'active',
+                'status'          => 'inactive',
                 'otp_expires_at'  => $otpExpiresAt,
                 'is_verified'     => false,
             ]);

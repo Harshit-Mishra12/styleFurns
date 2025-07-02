@@ -156,6 +156,7 @@ class TechnicianProfileController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'mobile' => $user->mobile,
+                'status' => $user->status,
                 'profile_picture' => $user->profile_picture,
                 'job_status' => $user->job_status,
                 'joined_at' => $user->created_at->toDateString(),

@@ -159,6 +159,8 @@ class BookingController extends Controller
         }
     }
 
+
+
     // public function index(Request $request)
     // {
     //     $query = Booking::with([
@@ -166,10 +168,10 @@ class BookingController extends Controller
     //         'parts',
     //         'images',
     //         'technician',
-    //         'bookingAssignments' // <- Add this line
+    //         'bookingAssignments'
     //     ])->orderBy('created_at', 'desc');
 
-    //     // Optional status filter
+    //     // 🔍 Optional status filter
     //     if ($request->filled('status')) {
     //         $validStatuses = [
     //             'pending',
@@ -190,6 +192,11 @@ class BookingController extends Controller
     //         }
     //     }
 
+    //     // 🔍 Optional technician_id filter
+    //     if ($request->filled('technician_id')) {
+    //         $query->where('current_technician_id', $request->technician_id);
+    //     }
+
     //     $bookings = $query->get();
 
     //     return response()->json([
@@ -201,8 +208,14 @@ class BookingController extends Controller
     //     ]);
     // }
 
+
     public function index(Request $request)
     {
+        // ✅ Set pagination defaults
+        $limit   = $request->input('limit', 10);       // default limit = 10
+        $pageNo  = $request->input('page_no', 1);      // default page = 1
+        $offset  = ($pageNo - 1) * $limit;
+
         $query = Booking::with([
             'customer',
             'parts',
@@ -226,9 +239,9 @@ class BookingController extends Controller
                 $query->where('status', $request->status);
             } else {
                 return response()->json([
-                    'status_code' => 0,
-                    'message' => 'Invalid status filter.',
-                ], 400);
+                    'status_code' => 2,
+                    'message'     => 'Invalid status filter.',
+                ]);
             }
         }
 
@@ -237,14 +250,24 @@ class BookingController extends Controller
             $query->where('current_technician_id', $request->technician_id);
         }
 
-        $bookings = $query->get();
+        // ✅ Get total count before pagination
+        $total = $query->count();
+
+        // ✅ Apply limit and offset for pagination
+        $bookings = $query->skip($offset)->take($limit)->get();
 
         return response()->json([
             'status_code' => 1,
-            'data' => [
-                'bookings' => $bookings
-            ],
-            'message' => 'Bookings fetched successfully.'
+            'message'     => 'Bookings fetched successfully.',
+            'data'        => [
+                'bookings'       => $bookings,
+                'pagination' => [
+                    'total_records' => $total,
+                    'limit'         => (int) $limit,
+                    'page_no'       => (int) $pageNo,
+                    'total_pages'   => ceil($total / $limit),
+                ]
+            ]
         ]);
     }
 
@@ -539,6 +562,7 @@ class BookingController extends Controller
         $technicians = User::with(['technicianSkills', 'latestTechnicianArea'])
             ->where('role', 'technician')
             ->where('job_status', 'online')
+            ->where('status', 'active')
             ->get();
 
         // dd($technicians);
@@ -768,7 +792,7 @@ class BookingController extends Controller
     {
         $technicianId = $request->input('technician_id');
 
-        // Define valid booking statuses
+        // Booking status counts
         $allStatuses = [
             'pending',
             'completed',
@@ -783,7 +807,6 @@ class BookingController extends Controller
         foreach ($allStatuses as $status) {
             $query = Booking::where('status', $status);
 
-            // If technician_id is present, filter bookings accordingly
             if (!empty($technicianId)) {
                 $query->where('current_technician_id', $technicianId);
             }
@@ -791,8 +814,20 @@ class BookingController extends Controller
             $statusCounts[$status] = $query->count();
         }
 
-        // Get total number of technicians in the system
-        $totalTechnicians = User::where('role', 'technician')->count();
+        // Technician counts
+        $totalTechnicians = User::where('role', 'technician')->where('status', 'active')->count(); // Excludes inactive
+        $activeTechnicians = User::where('role', 'technician')->where('status', 'active')->count();
+        $inactiveTechnicians = User::where('role', 'technician')->where('status', 'inactive')->count();
+
+        $onlineTechnicians = User::where('role', 'technician')
+            ->where('status', 'active')
+            ->where('job_status', 'online')
+            ->count();
+
+        $offlineTechnicians = User::where('role', 'technician')
+            ->where('status', 'active')
+            ->where('job_status', 'offline')
+            ->count();
 
         return response()->json([
             'status_code' => 1,
@@ -800,11 +835,16 @@ class BookingController extends Controller
             'data'        => [
                 'status' => $statusCounts,
                 'technicians' => [
-                    'total_technician' => $totalTechnicians,
+                    'total_technician'    => $totalTechnicians,
+                    'active_technician'   => $activeTechnicians,
+                    'inactive_technician' => $inactiveTechnicians,
+                    'offline_technician'  => $offlineTechnicians,
+                    'online_technician'   => $onlineTechnicians,
                 ]
             ]
         ]);
     }
+
     public function updateBookingStatus(Request $request)
     {
         $request->validate([
@@ -972,6 +1012,66 @@ class BookingController extends Controller
             'status_code' => 1,
             'message'     => 'Technician assigned and booking status updated to pending.',
             'data'        => []
+        ]);
+    }
+
+
+
+
+    public function updateTechnicianWorkStatus(Request $request)
+    {
+        $request->validate([
+            'technician_id'   => 'required|integer|exists:users,id',
+            'status'          => 'required|in:active,inactive',
+            'status_comment'  => 'nullable|string|max:255',
+        ]);
+
+        $technician = User::where('role', 'technician')->find($request->technician_id);
+
+        if (!$technician) {
+            return response()->json([
+                'status_code' => 2,
+                'message'     => 'Technician not found.',
+            ]);
+        }
+
+        $status = $request->status;
+        $comment = $request->status_comment ?? ($status === 'inactive' ? 'Technician made inactive' : null);
+
+        if ($status === 'inactive') {
+            // Update bookings and assignments for technician
+            $assignments = BookingAssignment::where('user_id', $technician->id)
+                ->where('status', 'assigned')
+                ->whereHas('booking', function ($q) {
+                    $q->where('status', 'pending');
+                })
+                ->get();
+
+            foreach ($assignments as $assignment) {
+                $booking = $assignment->booking;
+
+                if ($booking) {
+                    $booking->update([
+                        'status'                => 'rescheduling_required',
+                        'status_comment'        => $comment,
+                        'current_technician_id' => null,
+                    ]);
+
+                    $assignment->update([
+                        'status' => 'unassigned',
+                        'reason' => $comment,
+                    ]);
+                }
+            }
+        }
+
+        // Save the technician's active/inactive status in a dedicated column if available
+        $technician->status = $request->status; // Assuming there's a column like `is_active`
+        $technician->save();
+
+        return response()->json([
+            'status_code' => 1,
+            'message'     => "Technician status updated to '{$status}' successfully.",
         ]);
     }
 }
