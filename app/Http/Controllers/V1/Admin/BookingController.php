@@ -911,7 +911,7 @@ class BookingController extends Controller
                         $relatedBooking->update([
                             'status' => 'rescheduling_required',
                             'current_technician_id' => null,
-                            'status_comment' => 'Auto-rescheduled',
+                            'status_comment' =>  $comment,
                         ]);
                     }
                 }
