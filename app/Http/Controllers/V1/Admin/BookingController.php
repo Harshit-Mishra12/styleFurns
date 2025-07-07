@@ -595,12 +595,28 @@ class BookingController extends Controller
             //         'time' => \Carbon\Carbon::parse($assignment->time_start)->format('h:i A'),
             //     ];
             // })->values()->all();
-            $bookedSlots = $assignmentsToday->map(function ($assignment) {
-                return [
-                    'date' => \Carbon\Carbon::parse($assignment->slot_date)->format('Y-m-d'),
-                    'time' => \Carbon\Carbon::parse($assignment->time_start)->format('h:i A'),
-                ];
-            })->values()->all();
+            // $bookedSlots = $assignmentsToday->map(function ($assignment) {
+            //     return [
+            //         'date' => \Carbon\Carbon::parse($assignment->slot_date)->format('Y-m-d'),
+            //         'time' => \Carbon\Carbon::parse($assignment->time_start)->format('h:i A'),
+            //     ];
+            // })->values()->all();
+            $bookedSlots = [];
+
+            foreach ($assignmentsToday as $assignment) {
+                $date = \Carbon\Carbon::parse($assignment->slot_date)->toDateString(); // ensures no duplicate time part
+                $start = new \DateTime($date . ' ' . $assignment->time_start);
+                $end = new \DateTime($date . ' ' . $assignment->time_end);
+
+                while ($start < $end) {
+                    $bookedSlots[] = [
+                        'date' => $start->format('Y-m-d'),
+                        'time' => $start->format('g:i A'),
+                    ];
+                    $start->modify('+1 hour');
+                }
+            }
+
 
 
             $freeSlots = max(0, $maxDailySlots - $bookedSlotCount);
