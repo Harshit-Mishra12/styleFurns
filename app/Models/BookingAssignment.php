@@ -19,6 +19,7 @@ class BookingAssignment extends Model
         'slot_date',
         'time_start',
         'time_end',
+        'current_job_status'
     ];
 
     protected $casts = [
