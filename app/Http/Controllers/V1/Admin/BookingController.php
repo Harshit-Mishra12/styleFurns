@@ -868,6 +868,7 @@ class BookingController extends Controller
             'status'          => 'required|in:completed,rescheduling_required,waiting_parts',
             'status_comment'  => 'nullable|string|max:255',
             'price'           => 'required_if:status,completed|nullable|numeric|min:0',
+            'reschedule_all_bookings' => 'nullable|boolean',
         ]);
 
         $booking = Booking::find($request->booking_id);
@@ -883,8 +884,60 @@ class BookingController extends Controller
         $status = $request->status;
         $comment = $request->status_comment;
         $price = $request->price;
+        $today = now()->toDateString();
+        // Keep the above logic unchanged, then add this separately
+        if (
+            $status === 'rescheduling_required' &&
+            $request->boolean('reschedule_all_bookings')
+        ) {
+            $technicianId = $booking->current_technician_id;
 
-        if ($status === 'rescheduling_required' || $status === 'waiting_parts') {
+            if ($technicianId) {
+                $bookingDate = \Carbon\Carbon::parse($booking->slot_date)->toDateString();
+
+                $otherAssignments = BookingAssignment::where('user_id', $technicianId)
+                    ->where('status', 'assigned')
+                    ->whereDate('slot_date',   $today)
+                    ->get();
+
+                foreach ($otherAssignments as $otherAssignment) {
+                    $otherAssignment->update([
+                        'status' => 'unassigned',
+                        'reason' => 'Auto-rescheduled due to technician unavailability',
+                    ]);
+
+                    $relatedBooking = $otherAssignment->booking;
+                    if ($relatedBooking && $relatedBooking->current_technician_id == $technicianId) {
+                        $relatedBooking->update([
+                            'status' => 'rescheduling_required',
+                            'current_technician_id' => null,
+                            'status_comment' => 'Auto-rescheduled',
+                        ]);
+                    }
+                }
+
+                // Mark technician offline
+                \App\Models\User::where('id', $technicianId)->update(['job_status' => 'offline']);
+            }
+        } else if ($status === 'rescheduling_required' || $status === 'waiting_parts') {
+            $assignment = BookingAssignment::where('booking_id', $booking->id)
+                ->where('status', 'assigned')
+                ->latest()
+                ->first();
+
+            if ($assignment) {
+                $assignment->update([
+                    'status' => 'unassigned',
+                    'reason' => $comment ?? $status,
+                ]);
+            }
+
+            $booking->update([
+                'status' => $status,
+                'status_comment' => $comment,
+                'current_technician_id' => null,
+            ]);
+        } elseif ($status === 'cancelled') {
             $assignment = BookingAssignment::where('booking_id', $booking->id)
                 ->where('status', 'assigned')
                 ->latest()
