@@ -865,7 +865,7 @@ class BookingController extends Controller
     {
         $request->validate([
             'booking_id'      => 'required|integer|exists:bookings,id',
-            'status'          => 'required|in:completed,rescheduling_required,waiting_parts',
+            'status'          => 'required|in:completed,rescheduling_required,waiting_parts,cancelled',
             'status_comment'  => 'nullable|string|max:255',
             'price'           => 'required_if:status,completed|nullable|numeric|min:0',
             'reschedule_all_bookings' => 'nullable|boolean',
