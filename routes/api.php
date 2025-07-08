@@ -55,6 +55,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/notifications', [NotificationController::class, 'index']);
         Route::post('/notifications/mark-read', [NotificationController::class, 'markAsRead']);
+        Route::post('/save-push-token', [NotificationController::class, 'store']);
     });
 
 
