@@ -4,6 +4,7 @@ namespace App\Http\Controllers\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
+use App\Models\UserPushToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -51,6 +52,34 @@ class NotificationController extends Controller
         return response()->json([
             'status_code' => 1,
             'message' => 'Notification(s) marked as read.'
+        ]);
+    }
+
+
+    public function store(Request $request)
+    {
+        $request->validate([
+            'token' => 'required|string'
+        ]);
+
+        $user = $request->user();
+        $token = $request->input('token');
+
+        // 1. If this token is already assigned to another user, null it
+        UserPushToken::where('device_token', $token)
+            ->where('user_id', '!=', $user->id)
+            ->update(['device_token' => null]);
+
+        // 2. Update or create current user's token
+        $pushToken = UserPushToken::updateOrCreate(
+            ['user_id' => $user->id],
+            ['device_token' => $token]
+        );
+
+        return response()->json([
+            'status_code' => 1,
+            'message' => 'Push token saved successfully.',
+            'data' => $pushToken
         ]);
     }
 }
