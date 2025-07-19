@@ -151,6 +151,14 @@ class Helper
                 $title = 'Shift Ending Soon';
                 $body = 'Your shift is ending soon. Please remember to update offline status.';
                 break;
+            case 7:
+                $title = 'Booking Cancelled';
+                $body = 'One of your bookings has been cancelled and is no longer assigned to you.';
+                break;
+            case 8:
+                $title = 'Bookings Unassigned';
+                $body = 'All of your bookings have been rescheduled and are no longer assigned to you.';
+                break;
             default:
                 $title = 'Notification';
                 $body = 'You have a new notification.';
