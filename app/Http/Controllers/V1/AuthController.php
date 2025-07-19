@@ -323,7 +323,6 @@ class AuthController extends Controller
             $user->update([
                 'is_verified' => true,
                 'otp' => '',
-                'status' => 'active'
             ]);
             $token = $user->createToken('api-token')->plainTextToken;
             // $this->createSubscription($user->id);
