@@ -945,6 +945,7 @@ class BookingController extends Controller
                 'status_comment' => $comment,
                 'current_technician_id' => null,
             ]);
+            Helper::sendPushNotification(3, [$booking->current_technician_id]);
         } elseif ($status === 'cancelled') {
             $assignment = BookingAssignment::where('booking_id', $booking->id)
                 ->where('status', 'assigned')
