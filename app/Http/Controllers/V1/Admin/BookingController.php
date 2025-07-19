@@ -961,7 +961,7 @@ class BookingController extends Controller
                 ]);
             }
             if ($booking->current_technician_id) {
-                Helper::sendPushNotification(3, [$booking->current_technician_id]);
+                Helper::sendPushNotification(7, [$booking->current_technician_id]);
             }
             $booking->update([
                 'status' => $status,
