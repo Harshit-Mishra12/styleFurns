@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Helpers\Helper;
 use Illuminate\Console\Command;
 use App\Models\Booking;
 use App\Models\BookingAssignment;
@@ -42,7 +43,7 @@ class AutoRescheduleMissedBookings extends Command
                 if (!$booking) {
                     continue;
                 }
-
+                $technicianId = $booking->current_technician_id ?: $assignment->user_id;
                 $assignment->update([
                     'status' => 'unassigned',
                     'reason' => 'arrived_late',
@@ -55,6 +56,10 @@ class AutoRescheduleMissedBookings extends Command
                 ]);
 
                 $affected++;
+
+                if ($technicianId) {
+                    Helper::sendPushNotification(3, [$technicianId]);
+                }
             }
         });
 

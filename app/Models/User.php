@@ -29,7 +29,8 @@ class User extends Authenticatable
         'verification_uid',
         'otp',
         'otp_expires_at',
-        'is_verified'
+        'is_verified',
+        'status'
     ];
 
     /**
