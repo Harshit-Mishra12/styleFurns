@@ -939,13 +939,15 @@ class BookingController extends Controller
                     'reason' => $comment ?? $status,
                 ]);
             }
+            if ($booking->current_technician_id) {
+                Helper::sendPushNotification(3, [$booking->current_technician_id]);
+            }
 
             $booking->update([
                 'status' => $status,
                 'status_comment' => $comment,
                 'current_technician_id' => null,
             ]);
-            Helper::sendPushNotification(3, [$booking->current_technician_id]);
         } elseif ($status === 'cancelled') {
             $assignment = BookingAssignment::where('booking_id', $booking->id)
                 ->where('status', 'assigned')
@@ -958,13 +960,14 @@ class BookingController extends Controller
                     'reason' => $comment ?? $status,
                 ]);
             }
-
+            if ($booking->current_technician_id) {
+                Helper::sendPushNotification(3, [$booking->current_technician_id]);
+            }
             $booking->update([
                 'status' => $status,
                 'status_comment' => $comment,
                 'current_technician_id' => null,
             ]);
-            Helper::sendPushNotification(7, [$booking->current_technician_id]);
         } elseif ($status === 'completed') {
             $booking->update([
                 'status' => 'completed',
