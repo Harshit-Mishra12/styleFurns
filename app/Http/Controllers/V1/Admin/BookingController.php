@@ -141,6 +141,7 @@ class BookingController extends Controller
                     'time_start'  => $slot['time_start'],
                     'time_end'    => $slot['time_end'],
                 ]);
+                Helper::sendPushNotification(1, [$slot['technician_id']]);
             }
 
             DB::commit();

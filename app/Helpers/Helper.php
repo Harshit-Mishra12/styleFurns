@@ -7,6 +7,9 @@ use Exception;
 use Illuminate\Support\Facades\Mail;
 use DateTime;
 use DateTimeZone;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\DB;
+
 
 class Helper
 {
@@ -116,5 +119,70 @@ class Helper
     public static function sendPhpEmail($to, $subject, $body, $headers)
     {
         mail($to, $subject, $body, $headers);
+    }
+    public static function sendPushNotification($notificationType, $technicianIds)
+    {
+        $title = '';
+        $body = '';
+
+        // Map notification type to title and body
+        switch ($notificationType) {
+            case 1:
+                $title = 'New Booking Assigned';
+                $body = 'A new booking has been assigned to you.';
+                break;
+            case 2:
+                $title = 'Booking Rescheduled';
+                $body = 'A booking has been rescheduled to you.';
+                break;
+            case 3:
+                $title = 'Booking Unassigned';
+                $body = 'One of your bookings has been rescheduled and is no longer assigned to you.';
+                break;
+            case 4:
+                $title = 'Location Update Needed';
+                $body = 'Please remember to keep updating your locations.';
+                break;
+            case 5:
+                $title = 'Shift Starting Soon';
+                $body = 'Your shift is about to start. Please remember to update online status.';
+                break;
+            case 6:
+                $title = 'Shift Ending Soon';
+                $body = 'Your shift is ending soon. Please remember to update offline status.';
+                break;
+            default:
+                $title = 'Notification';
+                $body = 'You have a new notification.';
+        }
+
+        foreach ($technicianIds as $techId) {
+            // Fetch device tokens from user_push_tokens table
+            $tokens = DB::table('user_push_tokens')
+                ->where('user_id', $techId)
+                ->pluck('device_token')
+                ->toArray();
+
+            if (empty($tokens)) {
+                \Log::warning("No device tokens found for technician ID: $techId");
+                continue;
+            }
+
+            foreach ($tokens as $token) {
+                $message = [
+                    'to'    => $token,
+                    'sound' => 'default',
+                    'title' => $title,
+                    'body'  => $body,
+                    'data'  => ['notificationType' => $notificationType, 'technicianId' => $techId],
+                ];
+
+                try {
+                    Http::post("https://exp.host/--/api/v2/push/send", $message);
+                } catch (\Exception $e) {
+                    \Log::error("Failed to send notification to technician $techId: " . $e->getMessage());
+                }
+            }
+        }
     }
 }
