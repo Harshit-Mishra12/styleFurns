@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Helpers\Helper;
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use App\Models\UserPushToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class NotificationController extends Controller
 {
@@ -80,6 +82,30 @@ class NotificationController extends Controller
             'status_code' => 1,
             'message' => 'Push token saved successfully.',
             'data' => $pushToken
+        ]);
+    }
+    public function send(Request $request)
+    {
+
+        $data = $request->validate([
+            'notification_type' => ['required', 'integer', Rule::in([1, 2, 3, 4, 5, 6])],
+            'technician_ids'    => ['required', 'array', 'min:1'],
+            'technician_ids.*'  => ['integer', 'exists:users,id'],
+        ]);
+
+
+        Helper::sendPushNotification(
+            $data['notification_type'],
+            $data['technician_ids']
+        );
+
+        return response()->json([
+            'status_code' => 1,
+            'message'     => 'Test notification dispatched (check device(s) & logs).',
+            'data'        => [
+                'notification_type' => $data['notification_type'],
+                'technician_ids'    => $data['technician_ids']
+            ]
         ]);
     }
 }

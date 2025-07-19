@@ -31,6 +31,7 @@ Route::prefix('v1')->group(function () {
         return response()->json(['message' => 'Application optimized successfully.']);
     })->name('optimize');
 
+    Route::post('/notifications/test-send', [NotificationController::class, 'send']);
     Route::post("/auth/login", [AuthController::class, 'login']);
     Route::post("/auth/register", [AuthController::class, 'register']);
     Route::post("/auth/register2", [AuthController::class, 'register2']);
