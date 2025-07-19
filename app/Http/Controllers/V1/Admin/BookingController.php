@@ -1070,6 +1070,7 @@ class BookingController extends Controller
             'time_start'   => $slot['time_start'],
             'time_end'     => $slot['time_end'],
         ]);
+        Helper::sendPushNotification(2, [$slot['technician_id']]);
 
         // Step 2: Update booking
         $booking->update([

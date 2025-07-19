@@ -44,6 +44,17 @@ class Kernel extends ConsoleKernel
 
         $schedule->command('technicians:set-offline')->dailyAt('22:00');
         $schedule->command('bookings:auto-reschedule')->everyThreeMinutes();
+
+        $schedule->command('notifications:shift-start')->dailyAt('07:55');
+        $schedule->command('notifications:shift-start')->dailyAt('08:00');
+        $schedule->command('notifications:shift-start')->dailyAt('08:05');
+
+        // Shift end reminders (9:55 PM, 10:00 PM, 10:05 PM)
+        $schedule->command('notifications:shift-end')->dailyAt('21:55');
+        $schedule->command('notifications:shift-end')->dailyAt('22:00');
+        $schedule->command('notifications:shift-end')->dailyAt('22:05');
+
+        $schedule->command('notifications:location-update')->everyFifteenMinutes();
         // $schedule->command('create:random-team')->everyThreeMinutes();
         // $schedule->command('events:update-status')->everyThreeMinutes(); // Runs every hour
         // $schedule->command('fetch:match-player-points')->everyThreeMinutes();
