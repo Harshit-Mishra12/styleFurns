@@ -889,11 +889,18 @@ class BookingController extends Controller
         // Keep the above logic unchanged, then add this separately
         if (
             $status === 'rescheduling_required' &&
+            !$request->boolean('reschedule_all_bookings')
+        ) {
+            Helper::sendPushNotification(3, [$booking->current_technician_id]);
+        }
+        if (
+            $status === 'rescheduling_required' &&
             $request->boolean('reschedule_all_bookings')
         ) {
             $technicianId = $booking->current_technician_id;
 
             if ($technicianId) {
+                Helper::sendPushNotification(8, [$technicianId]);
                 $bookingDate = \Carbon\Carbon::parse($booking->slot_date)->toDateString();
 
                 $otherAssignments = BookingAssignment::where('user_id', $technicianId)
@@ -956,6 +963,7 @@ class BookingController extends Controller
                 'status_comment' => $comment,
                 'current_technician_id' => null,
             ]);
+            Helper::sendPushNotification(7, [$booking->current_technician_id]);
         } elseif ($status === 'completed') {
             $booking->update([
                 'status' => 'completed',
